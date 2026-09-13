@@ -23,14 +23,32 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
-  buildTypes {
-    release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("debug")
-    }
+  signingConfigs {
+      create("release") {
+          val keystorePath = providers.gradleProperty("android.injected.signing.store.file")
+              .orNull
+  
+          if (keystorePath != null) {
+              storeFile = file(keystorePath)
+              storePassword = providers.gradleProperty("android.injected.signing.store.password").orNull
+              keyAlias = providers.gradleProperty("android.injected.signing.key.alias").orNull
+              keyPassword = providers.gradleProperty("android.injected.signing.key.password").orNull
+          }
+      }
   }
+  
+  buildTypes {
+      release {
+          isCrunchPngs = false
+          isMinifyEnabled = false
+          proguardFiles(
+              getDefaultProguardFile("proguard-android-optimize.txt"),
+              "proguard-rules.pro"
+          )
+          signingConfig = signingConfigs.getByName("release")
+      }
+  }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
