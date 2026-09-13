@@ -1,0 +1,6 @@
+{
+  "name": "時間割アプリ",
+  "description": "時間割と移動教室、行事、メモを一目で確認できる直感的な学校生活サポートアプリ",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

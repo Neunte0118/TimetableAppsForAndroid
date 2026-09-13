@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget Dark Mode Colors -->
+    <color name="widget_bg">#1E293B</color>
+    <color name="widget_border">#334155</color>
+    <color name="widget_card_bg">#0F172A</color>
+    <color name="widget_card_border">#334155</color>
+    <color name="widget_card_changed_bg">#3D2506</color>
+    <color name="widget_card_changed_border">#FBBF24</color>
+    <color name="widget_text_primary">#F8FAFC</color>
+    <color name="widget_text_secondary">#CBD5E1</color>
+    <color name="widget_text_muted">#94A3B8</color>
+    <color name="widget_nav_btn_bg">#334155</color>
+    <color name="widget_nav_btn_icon">#F1F5F9</color>
+    <color name="widget_refresh_btn_bg">#312E81</color>
+    <color name="widget_refresh_btn_icon">#A5B4FC</color>
+
+    <color name="widget_event_section_bg">#2C1A14</color>
+    <color name="widget_event_section_border">#7C2D12</color>
+    <color name="widget_event_title">#FB923C</color>
+    <color name="widget_event_text">#FFEDD5</color>
+
+    <color name="widget_memo_section_bg">#0D281E</color>
+    <color name="widget_memo_section_border">#065F46</color>
+    <color name="widget_memo_title">#34D399</color>
+    <color name="widget_memo_text">#ECFDF5</color>
+</resources>

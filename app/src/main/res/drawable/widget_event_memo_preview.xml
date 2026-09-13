@@ -1,0 +1,73 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <!-- Card Background -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="1.5"
+        android:pathData="M 12,4 L 188,4 A 8,8 0 0 1 196,12 L 196,188 A 8,8 0 0 1 188,196 L 12,196 A 8,8 0 0 1 4,188 L 4,12 A 8,8 0 0 1 12,4 Z" />
+
+    <!-- Top Navigation Bar -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 12,12 L 32,12 A 4,4 0 0 1 36,16 L 36,28 A 4,4 0 0 1 32,32 L 12,32 A 4,4 0 0 1 8,28 L 8,16 A 4,4 0 0 1 12,12 Z" />
+    <path
+        android:fillColor="#334155"
+        android:pathData="M 24,18 L 18,22 L 24,26 Z" />
+
+    <!-- Date Title Pill -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 44,12 L 124,12 A 4,4 0 0 1 128,16 L 128,28 A 4,4 0 0 1 124,32 L 44,32 A 4,4 0 0 1 40,16 L 40,16 A 4,4 0 0 1 44,12 Z" />
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M 74,18 L 94,18 L 94,26 L 74,26 Z" />
+
+    <!-- Next Button -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 136,12 L 156,12 A 4,4 0 0 1 160,16 L 160,28 A 4,4 0 0 1 156,32 L 136,32 A 4,4 0 0 1 132,28 L 132,16 A 4,4 0 0 1 136,12 Z" />
+    <path
+        android:fillColor="#334155"
+        android:pathData="M 144,18 L 150,22 L 144,26 Z" />
+
+    <!-- Refresh Button -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M 172,12 L 188,12 A 4,4 0 0 1 192,16 L 192,28 A 4,4 0 0 1 188,32 L 172,32 A 4,4 0 0 1 168,28 L 168,16 A 4,4 0 0 1 172,12 Z" />
+
+    <!-- Event Card (Warm Orange) -->
+    <path
+        android:fillColor="#FFF7ED"
+        android:strokeColor="#FFEDD5"
+        android:strokeWidth="1.5"
+        android:pathData="M 12,38 L 188,38 A 6,6 0 0 1 194,44 L 194,108 A 6,6 0 0 1 188,114 L 12,114 A 6,6 0 0 1 6,108 L 6,44 A 6,6 0 0 1 12,38 Z" />
+    <path
+        android:fillColor="#C2410C"
+        android:pathData="M 16,48 L 44,48 L 44,56 L 16,56 Z" />
+    <path
+        android:fillColor="#431407"
+        android:pathData="M 16,66 L 120,66 L 120,76 L 16,76 Z" />
+    <path
+        android:fillColor="#431407"
+        android:pathData="M 16,84 L 90,84 L 90,92 L 16,92 Z" />
+
+    <!-- Memo Card (Soft Green) -->
+    <path
+        android:fillColor="#F0FDF4"
+        android:strokeColor="#DCFCE7"
+        android:strokeWidth="1.5"
+        android:pathData="M 12,122 L 188,122 A 6,6 0 0 1 194,128 L 194,190 A 6,6 0 0 1 188,196 L 12,196 A 6,6 0 0 1 6,190 L 6,128 A 6,6 0 0 1 12,122 Z" />
+    <path
+        android:fillColor="#047857"
+        android:pathData="M 16,132 L 44,132 L 44,140 L 16,140 Z" />
+    <path
+        android:fillColor="#064E3B"
+        android:pathData="M 16,150 L 150,150 L 150,158 L 16,158 Z" />
+    <path
+        android:fillColor="#064E3B"
+        android:pathData="M 16,166 L 110,166 L 110,174 L 16,174 Z" />
+</vector>

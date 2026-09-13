@@ -1,0 +1,122 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    <!-- Card Background -->
+    <path
+        android:fillColor="#F8FAFC"
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="1.5"
+        android:pathData="M 12,4 L 188,4 A 8,8 0 0 1 196,12 L 196,188 A 8,8 0 0 1 188,196 L 12,196 A 8,8 0 0 1 4,188 L 4,12 A 8,8 0 0 1 12,4 Z" />
+
+    <!-- Top Navigation Bar -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 12,12 L 32,12 A 4,4 0 0 1 36,16 L 36,28 A 4,4 0 0 1 32,32 L 12,32 A 4,4 0 0 1 8,28 L 8,16 A 4,4 0 0 1 12,12 Z" />
+    <path
+        android:fillColor="#334155"
+        android:pathData="M 24,18 L 18,22 L 24,26 Z" />
+
+    <!-- Date Title Pill -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 44,12 L 124,12 A 4,4 0 0 1 128,16 L 128,28 A 4,4 0 0 1 124,32 L 44,32 A 4,4 0 0 1 40,16 L 40,16 A 4,4 0 0 1 44,12 Z" />
+    <!-- "今日" text representation -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M 74,18 L 94,18 L 94,26 L 74,26 Z" />
+
+    <!-- Next Button -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M 136,12 L 156,12 A 4,4 0 0 1 160,16 L 160,28 A 4,4 0 0 1 156,32 L 136,32 A 4,4 0 0 1 132,28 L 132,16 A 4,4 0 0 1 136,12 Z" />
+    <path
+        android:fillColor="#334155"
+        android:pathData="M 144,18 L 150,22 L 144,26 Z" />
+
+    <!-- Refresh Button -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M 172,12 L 188,12 A 4,4 0 0 1 192,16 L 192,28 A 4,4 0 0 1 188,32 L 172,32 A 4,4 0 0 1 168,28 L 168,16 A 4,4 0 0 1 172,12 Z" />
+
+    <!-- Period 1 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#E2E8F0"
+        android:strokeWidth="1"
+        android:pathData="M 12,38 L 188,38 A 4,4 0 0 1 192,42 L 192,64 A 4,4 0 0 1 188,68 L 12,68 A 4,4 0 0 1 8,64 L 8,42 A 4,4 0 0 1 12,38 Z" />
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M 14,44 L 26,44 L 26,62 L 14,62 Z" />
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M 34,48 L 74,48 L 74,58 L 34,58 Z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 150,50 L 184,50 L 184,56 L 150,56 Z" />
+
+    <!-- Period 2 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#E2E8F0"
+        android:strokeWidth="1"
+        android:pathData="M 12,70 L 188,70 A 4,4 0 0 1 192,74 L 192,96 A 4,4 0 0 1 188,100 L 12,100 A 4,4 0 0 1 8,96 L 8,74 A 4,4 0 0 1 12,70 Z" />
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M 14,76 L 26,76 L 26,94 L 14,94 Z" />
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M 34,80 L 74,80 L 74,90 L 34,90 Z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 150,82 L 184,82 L 184,88 L 150,88 Z" />
+
+    <!-- Period 3 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#E2E8F0"
+        android:strokeWidth="1"
+        android:pathData="M 12,102 L 188,102 A 4,4 0 0 1 192,106 L 192,128 A 4,4 0 0 1 188,132 L 12,132 A 4,4 0 0 1 8,128 L 8,106 A 4,4 0 0 1 12,102 Z" />
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M 14,108 L 26,108 L 26,126 L 14,126 Z" />
+    <path
+        android:fillColor="#E65100"
+        android:pathData="M 34,112 L 74,112 L 74,122 L 34,122 Z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 150,114 L 184,114 L 184,120 L 150,120 Z" />
+
+    <!-- Period 4 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#E2E8F0"
+        android:strokeWidth="1"
+        android:pathData="M 12,134 L 188,134 A 4,4 0 0 1 192,138 L 192,160 A 4,4 0 0 1 188,164 L 12,164 A 4,4 0 0 1 8,160 L 8,138 A 4,4 0 0 1 12,134 Z" />
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M 14,140 L 26,140 L 26,158 L 14,158 Z" />
+    <path
+        android:fillColor="#C2185B"
+        android:pathData="M 34,144 L 74,144 L 74,154 L 34,154 Z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 150,146 L 184,146 L 184,152 L 150,152 Z" />
+
+    <!-- Period 5 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#E2E8F0"
+        android:strokeWidth="1"
+        android:pathData="M 12,166 L 188,166 A 4,4 0 0 1 192,170 L 192,192 A 4,4 0 0 1 188,196 L 12,196 A 4,4 0 0 1 8,192 L 8,170 A 4,4 0 0 1 12,166 Z" />
+    <path
+        android:fillColor="#64748B"
+        android:pathData="M 14,172 L 26,172 L 26,190 L 14,190 Z" />
+    <path
+        android:fillColor="#6A1B9A"
+        android:pathData="M 34,176 L 74,176 L 74,186 L 34,186 Z" />
+    <path
+        android:fillColor="#94A3B8"
+        android:pathData="M 150,178 L 184,178 L 184,184 L 150,184 Z" />
+</vector>

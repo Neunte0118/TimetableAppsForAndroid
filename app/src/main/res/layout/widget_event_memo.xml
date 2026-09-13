@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_event_memo_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <!-- Header: [<] [Date] [>] + [Refresh] -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="6dp">
+
+        <ImageView
+            android:id="@+id/widget_em_btn_prev"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/widget_nav_btn_bg"
+            android:contentDescription="前日"
+            android:padding="6dp"
+            android:src="@drawable/ic_widget_chevron_left" />
+
+        <TextView
+            android:id="@+id/widget_em_title_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="今日"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/widget_em_btn_next"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/widget_nav_btn_bg"
+            android:contentDescription="翌日"
+            android:padding="6dp"
+            android:src="@drawable/ic_widget_chevron_right" />
+
+        <ImageView
+            android:id="@+id/widget_em_btn_home"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_home_bg"
+            android:contentDescription="今日に戻る"
+            android:padding="6dp"
+            android:src="@drawable/ic_widget_home" />
+    </LinearLayout>
+
+    <!-- Setup Required Message (Shown until Terms & Class selection finished) -->
+    <LinearLayout
+        android:id="@+id/widget_em_setup_required_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/widget_em_setup_required_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:text="初期設定を完了させてください。"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="12.5sp" />
+    </LinearLayout>
+
+    <!-- Content: 2 distinct sections (Top: 行事, Bottom: メモ) -->
+    <LinearLayout
+        android:id="@+id/widget_em_content_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- 行事 Section Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginBottom="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_event_section_bg"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="行事"
+                    android:src="@drawable/ic_widget_event" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="行事"
+                    android:textColor="@color/widget_event_title"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/widget_em_event_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:lineSpacingMultiplier="1.15"
+                android:maxLines="4"
+                android:text="なし"
+                android:textColor="@color/widget_event_text"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <!-- メモ Section Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_memo_section_bg"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription="メモ"
+                    android:src="@drawable/ic_widget_note" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="メモ"
+                    android:textColor="@color/widget_memo_title"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/widget_em_memo_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:lineSpacingMultiplier="1.15"
+                android:maxLines="4"
+                android:text="なし"
+                android:textColor="@color/widget_memo_text"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

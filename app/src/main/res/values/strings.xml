@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">時間割アプリ</string>
+    <string name="widget_timetable_name">時間割（当日・日付切替）</string>
+    <string name="widget_timetable_description">1日の時間割を表示します。</string>
+    <string name="widget_event_memo_name">行事・メモ</string>
+    <string name="widget_event_memo_description">行事とメモを表示します。</string>
+</resources>
