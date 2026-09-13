@@ -27,12 +27,27 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TIMETABLE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > timetable-release.keystore
+
+      - name: Build Release APK
+        env:
+          TIMETABLE_KEYSTORE_PASSWORD: ${{ secrets.TIMETABLE_KEYSTORE_PASSWORD }}
+          TIMETABLE_KEY_ALIAS: ${{ secrets.TIMETABLE_KEY_ALIAS }}
+          TIMETABLE_KEY_PASSWORD: ${{ secrets.TIMETABLE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/timetable-release.keystore" \
+            -Pandroid.injected.signing.store.password="$TIMETABLE_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$TIMETABLE_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$TIMETABLE_KEY_PASSWORD"
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: timetable-app-debug
-          path: "**/build/outputs/apk/debug/*.apk"
+          name: timetable-app-release
+          path: "**/build/outputs/apk/release/*.apk"
           if-no-files-found: error
