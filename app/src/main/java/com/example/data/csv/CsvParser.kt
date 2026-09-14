@@ -101,8 +101,8 @@ object CsvParser {
             if (m != null && d != null) return Pair(m, d)
         }
 
-        // 2. "2026/07/20" or "2026-08-24" or "7/20"
-        val slashRegex = Regex("""(?:\d{4}[/-])?(\d{1,2})[/-](\d{1,2})""")
+        // 2. "2026/07/20" or "2026-08-24" or "2026.08.24" or "7/20"
+        val slashRegex = Regex("""(?:\d{4}[/.-])?(\d{1,2})[/.-](\d{1,2})""")
         slashRegex.find(clean)?.let { match ->
             val m = match.groupValues[1].toIntOrNull()
             val d = match.groupValues[2].toIntOrNull()

@@ -140,7 +140,7 @@ object NotificationHelper {
     fun showTodayTimetableNotification(context: Context, isTest: Boolean = false): Boolean {
         createNotificationChannel(context)
 
-        val repo = TimetableRepository(context)
+        val repo = TimetableRepository.getInstance(context)
         val selectedClass = repo.selectedClass.value
         val today = LocalDate.now()
         val schedule = repo.getDaySchedule(selectedClass, today, today)
@@ -159,9 +159,12 @@ object NotificationHelper {
             }
         }
 
+        val eventText = if (schedule.event.isNotBlank()) schedule.event.trim() else "なし"
+        val memoText = if (schedule.memo.isNotBlank()) schedule.memo.trim() else "なし"
+
         // 行事の上に改行
-        bodyBuilder.append("\n行事：${schedule.event}")
-        bodyBuilder.append("\nメモ：${schedule.memo}")
+        bodyBuilder.append("\n行事：$eventText")
+        bodyBuilder.append("\nメモ：$memoText")
 
         val fullNotificationContent = bodyBuilder.toString().trim()
 
@@ -182,10 +185,12 @@ object NotificationHelper {
             null
         }
 
-        val summaryText = if (activePeriods.isNotEmpty()) {
+        val summaryText = if (schedule.event.isNotBlank()) {
+            "行事: ${schedule.event}"
+        } else if (activePeriods.isNotEmpty()) {
             activePeriods.joinToString(", ") { it.subject }
         } else {
-            "授業の予定はありません"
+            "予定はありません"
         }
 
         val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)

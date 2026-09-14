@@ -526,6 +526,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
         com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
+        com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
         refreshSchedules()
     }
 
@@ -538,6 +539,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
         com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
+        com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
         refreshSchedules()
     }
 
@@ -561,6 +563,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
             com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
+            com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
             refreshSchedules()
             checkForAppUpdate()
         }
@@ -623,6 +626,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         repository.setCompletedInitialSetup(true)
         _uiState.update { it.copy(onboardingStep = OnboardingStep.NONE) }
         com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
+        com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
     }
 
     fun updateElectiveChoice(origin: String, elective: String) {

@@ -355,6 +355,16 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                 val memoText = if (schedule.memo.isNotBlank()) schedule.memo.trim() else "なし"
                 views.setTextViewText(R.id.widget_em_memo_content, memoText)
 
+                // キャッシュが空の場合、バックグラウンドで最新CSVを取得して自動反映
+                if (repo.csvSyncManager.events.isEmpty() && !repo.csvSyncManager.syncStatus.value.isSyncing) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            repo.syncCsvData()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             } catch (e: Exception) {
                 Log.e("EventMemoWidget", "Error updating widget $appWidgetId", e)

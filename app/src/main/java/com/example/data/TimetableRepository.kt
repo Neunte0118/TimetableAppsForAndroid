@@ -373,6 +373,7 @@ class TimetableRepository(private val context: Context) {
     fun setAgreedTerms(agreed: Boolean) {
         prefs.edit().putBoolean("has_agreed_terms", agreed).apply()
         TimetableWidgetProvider.updateAllWidgets(context)
+        EventMemoWidgetProvider.updateAllWidgets(context)
     }
 
     fun hasSelectedClass(): Boolean {
@@ -382,6 +383,7 @@ class TimetableRepository(private val context: Context) {
     fun setClassSelected(selected: Boolean) {
         prefs.edit().putBoolean("has_selected_class", selected).apply()
         TimetableWidgetProvider.updateAllWidgets(context)
+        EventMemoWidgetProvider.updateAllWidgets(context)
     }
 
     fun hasCompletedTermsAndClass(): Boolean {

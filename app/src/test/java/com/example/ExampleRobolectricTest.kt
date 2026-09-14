@@ -144,6 +144,16 @@ class ExampleRobolectricTest {
     com.example.widget.TimetableWidgetProvider.updateAppWidget(context, android.appwidget.AppWidgetManager.getInstance(context), 101)
     com.example.widget.TimetableWidgetProvider.updateAllWidgets(context)
     com.example.widget.TimetableWidgetProvider.scheduleMidnightUpdate(context)
+
+    // Event & Memo widget
+    val repo = TimetableRepository.getInstance(context)
+    repo.setCompletedInitialSetup(true)
+    com.example.widget.EventMemoWidgetProvider.setWidgetDateOffset(context, 201, 0)
+    com.example.widget.EventMemoWidgetProvider.updateAppWidget(context, android.appwidget.AppWidgetManager.getInstance(context), 201)
+    com.example.widget.EventMemoWidgetProvider.updateAllWidgets(context)
+
+    // Notification
+    com.example.notification.NotificationHelper.showTodayTimetableNotification(context, isTest = true)
   }
 
   @Test

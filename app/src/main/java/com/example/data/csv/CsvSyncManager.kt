@@ -760,10 +760,8 @@ class CsvSyncManager(private val context: Context) {
             eventList.add("$holidayName (祝日)")
         }
 
-        val eventRow = events.find { it.month == date.monthValue && it.day == date.dayOfMonth }
-        if (eventRow != null && eventRow.event.isNotBlank()) {
-            eventList.add(eventRow.event)
-        }
+        val matchingEvents = events.filter { it.month == date.monthValue && it.day == date.dayOfMonth && it.event.isNotBlank() }
+        matchingEvents.forEach { eventList.add(it.event) }
 
         val combined = eventList.joinToString(" / ")
         return formatEventText(combined)
