@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.util.Log
+import android.util.SizeF
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
@@ -255,6 +256,88 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
             scheduleAlarms(context)
         }
 
+        private fun bindEventMemoViews(
+            views: RemoteViews,
+            context: Context,
+            appWidgetId: Int,
+            isSetupCompleted: Boolean,
+            dateStr: String,
+            eventText: String,
+            memoText: String
+        ) {
+            // Launch App on clicking root, date, or setup container
+            val mainIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val mainPending = PendingIntent.getActivity(
+                context,
+                appWidgetId * 100 + 14,
+                mainIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_event_memo_root, mainPending)
+            views.setOnClickPendingIntent(R.id.widget_em_title_date, mainPending)
+            views.setOnClickPendingIntent(R.id.widget_em_setup_required_container, mainPending)
+
+            if (!isSetupCompleted) {
+                views.setTextViewText(R.id.widget_em_title_date, "-")
+                views.setViewVisibility(R.id.widget_em_setup_required_container, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_em_content_container, View.GONE)
+                return
+            }
+
+            views.setViewVisibility(R.id.widget_em_setup_required_container, View.GONE)
+            views.setViewVisibility(R.id.widget_em_content_container, View.VISIBLE)
+
+            views.setTextViewText(R.id.widget_em_title_date, dateStr)
+
+            // Previous Day Button Intent (<)
+            val prevIntent = Intent(context, EventMemoWidgetProvider::class.java).apply {
+                action = ACTION_EM_PREV_DAY
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                data = Uri.parse("widget://eventmemo/$appWidgetId/prev")
+            }
+            val prevPending = PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 100 + 11,
+                prevIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_em_btn_prev, prevPending)
+
+            // Next Day Button Intent (>)
+            val nextIntent = Intent(context, EventMemoWidgetProvider::class.java).apply {
+                action = ACTION_EM_NEXT_DAY
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                data = Uri.parse("widget://eventmemo/$appWidgetId/next")
+            }
+            val nextPending = PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 100 + 12,
+                nextIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_em_btn_next, nextPending)
+
+            // Home Button Intent (今日・15:15以降は明日にリセット)
+            val homeIntent = Intent(context, EventMemoWidgetProvider::class.java).apply {
+                action = ACTION_EM_RESET_TODAY
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                data = Uri.parse("widget://eventmemo/$appWidgetId/home")
+            }
+            val homePending = PendingIntent.getBroadcast(
+                context,
+                appWidgetId * 100 + 13,
+                homeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_em_btn_home, homePending)
+
+            // Set Event & Memo content
+            views.setTextViewText(R.id.widget_em_event_content, eventText)
+            views.setTextViewText(R.id.widget_em_memo_content, memoText)
+        }
+
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
@@ -267,33 +350,6 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                 val targetDate = getBaseDate().plusDays(offset)
                 val today = LocalDate.now()
 
-                val views = RemoteViews(context.packageName, R.layout.widget_event_memo)
-
-                // Launch App on clicking root, date, or setup container
-                val mainIntent = Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                }
-                val mainPending = PendingIntent.getActivity(
-                    context,
-                    appWidgetId * 100 + 14,
-                    mainIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_event_memo_root, mainPending)
-                views.setOnClickPendingIntent(R.id.widget_em_title_date, mainPending)
-                views.setOnClickPendingIntent(R.id.widget_em_setup_required_container, mainPending)
-
-                if (!isSetupCompleted) {
-                    views.setTextViewText(R.id.widget_em_title_date, "-")
-                    views.setViewVisibility(R.id.widget_em_setup_required_container, View.VISIBLE)
-                    views.setViewVisibility(R.id.widget_em_content_container, View.GONE)
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
-                    return
-                }
-
-                views.setViewVisibility(R.id.widget_em_setup_required_container, View.GONE)
-                views.setViewVisibility(R.id.widget_em_content_container, View.VISIBLE)
-
                 val selectedClass = repo.selectedClass.value
                 val schedule = repo.getDaySchedule(selectedClass, targetDate, today)
 
@@ -304,56 +360,10 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                     today.minusDays(1) -> "昨日"
                     else -> "${targetDate.monthValue}/${targetDate.dayOfMonth}"
                 }
-                views.setTextViewText(R.id.widget_em_title_date, dateStr)
-
-                // Previous Day Button Intent (<)
-                val prevIntent = Intent(context, EventMemoWidgetProvider::class.java).apply {
-                    action = ACTION_EM_PREV_DAY
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    data = Uri.parse("widget://eventmemo/$appWidgetId/prev")
-                }
-                val prevPending = PendingIntent.getBroadcast(
-                    context,
-                    appWidgetId * 100 + 11,
-                    prevIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_em_btn_prev, prevPending)
-
-                // Next Day Button Intent (>)
-                val nextIntent = Intent(context, EventMemoWidgetProvider::class.java).apply {
-                    action = ACTION_EM_NEXT_DAY
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    data = Uri.parse("widget://eventmemo/$appWidgetId/next")
-                }
-                val nextPending = PendingIntent.getBroadcast(
-                    context,
-                    appWidgetId * 100 + 12,
-                    nextIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_em_btn_next, nextPending)
-
-                // Home Button Intent (今日・15:15以降は明日にリセット)
-                val homeIntent = Intent(context, EventMemoWidgetProvider::class.java).apply {
-                    action = ACTION_EM_RESET_TODAY
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                    data = Uri.parse("widget://eventmemo/$appWidgetId/home")
-                }
-                val homePending = PendingIntent.getBroadcast(
-                    context,
-                    appWidgetId * 100 + 13,
-                    homeIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_em_btn_home, homePending)
 
                 // 2. Set Event & Memo content
                 val eventText = if (schedule.event.isNotBlank()) schedule.event.trim() else "なし"
-                views.setTextViewText(R.id.widget_em_event_content, eventText)
-
                 val memoText = if (schedule.memo.isNotBlank()) schedule.memo.trim() else "なし"
-                views.setTextViewText(R.id.widget_em_memo_content, memoText)
 
                 // キャッシュが空の場合、バックグラウンドで最新CSVを取得して自動反映
                 if (repo.csvSyncManager.events.isEmpty() && !repo.csvSyncManager.syncStatus.value.isSyncing) {
@@ -365,7 +375,42 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                     }
                 }
 
-                appWidgetManager.updateAppWidget(appWidgetId, views)
+                val regularViews = RemoteViews(context.packageName, R.layout.widget_event_memo)
+                val compactViews = RemoteViews(context.packageName, R.layout.widget_event_memo_compact)
+
+                bindEventMemoViews(
+                    regularViews,
+                    context,
+                    appWidgetId,
+                    isSetupCompleted,
+                    dateStr,
+                    eventText,
+                    memoText
+                )
+                bindEventMemoViews(
+                    compactViews,
+                    context,
+                    appWidgetId,
+                    isSetupCompleted,
+                    dateStr,
+                    eventText,
+                    memoText
+                )
+
+                val finalViews = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    RemoteViews(
+                        mapOf(
+                            SizeF(100f, 40f) to compactViews,
+                            SizeF(100f, 110f) to regularViews
+                        )
+                    )
+                } else {
+                    val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+                    val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+                    if (minHeight in 1..109) compactViews else regularViews
+                }
+
+                appWidgetManager.updateAppWidget(appWidgetId, finalViews)
             } catch (e: Exception) {
                 Log.e("EventMemoWidget", "Error updating widget $appWidgetId", e)
             }

@@ -403,8 +403,12 @@ fun TimetableScreen(
             isNotificationEnabled = uiState.isDailyNotificationEnabled,
             notificationHour = uiState.notificationHour,
             notificationMinute = uiState.notificationMinute,
+            isNextClassNotificationEnabled = uiState.isNextClassNotificationEnabled,
+            nextClassLeadMinutes = uiState.nextClassLeadMinutes,
             onUpdateNotificationSettings = { enabled, h, m -> viewModel.updateDailyNotificationSettings(enabled, h, m) },
+            onUpdateNextClassNotificationSettings = { enabled, lead -> viewModel.updateNextClassNotificationSettings(enabled, lead) },
             onTestSendNotification = { viewModel.sendTestNotification() },
+            onTestSendNextClassNotification = { viewModel.sendTestNextClassNotification() },
             onDismiss = { viewModel.closeNotificationSettingsDialog() }
         )
     }
@@ -550,6 +554,10 @@ fun TimetableScreen(
             },
             onOpenDeveloperMenu = { viewModel.openCsvSettingsDialog() },
             onOpenHistory = { viewModel.openHistoryDialog() },
+            onCheckForAppUpdate = {
+                viewModel.closeOtherMenuSheet()
+                viewModel.checkForAppUpdate(manual = true)
+            },
             onOpenHelp = { viewModel.openHelpDialog() },
             onOpenTerms = { viewModel.openTermsDialog() },
             onOpenReportExternal = { viewModel.openExternalReportLink() },

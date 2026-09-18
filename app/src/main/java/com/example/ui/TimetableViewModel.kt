@@ -11,6 +11,7 @@ import com.example.data.csv.CsvSyncStatus
 import com.example.data.csv.CsvUrlsConfig
 import com.example.data.csv.UpdateHistoryRow
 import com.example.model.*
+import com.example.notification.NotificationHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -63,6 +64,9 @@ data class TimetableUiState(
     val isDailyNotificationEnabled: Boolean = true,
     val notificationHour: Int = 7,
     val notificationMinute: Int = 0,
+    // 次の授業の事前通知
+    val isNextClassNotificationEnabled: Boolean = true,
+    val nextClassLeadMinutes: Int = 5,
     // 検索機能
     val showSearchDialog: Boolean = false,
     val searchQuery: String = "",
@@ -131,6 +135,8 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             isDailyNotificationEnabled = repository.isDailyNotificationEnabled.value,
             notificationHour = repository.notificationHour.value,
             notificationMinute = repository.notificationMinute.value,
+            isNextClassNotificationEnabled = repository.isNextClassNotificationEnabled.value,
+            nextClassLeadMinutes = repository.nextClassLeadMinutes.value,
             csvUrlsConfig = repository.csvUrlsConfig.value,
             csvSyncStatus = repository.csvSyncStatus.value,
             onboardingStep = if (!repository.hasCompletedInitialSetup()) OnboardingStep.TERMS else OnboardingStep.NONE,
@@ -200,6 +206,23 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
             }.collect()
+        }
+
+        // Collect next class notification settings
+        viewModelScope.launch {
+            combine(
+                repository.isNextClassNotificationEnabled,
+                repository.nextClassLeadMinutes
+            ) { enabled, lead ->
+                enabled to lead
+            }.collect { (enabled, lead) ->
+                _uiState.update {
+                    it.copy(
+                        isNextClassNotificationEnabled = enabled,
+                        nextClassLeadMinutes = lead
+                    )
+                }
+            }
         }
 
         // Collect CSV configs and status
@@ -411,6 +434,37 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     fun sendTestNotification() {
         repository.testSendNotificationNow()
         _uiState.update { it.copy(infoMessage = "テスト通知を送信しました") }
+    }
+
+    fun updateNextClassNotificationSettings(enabled: Boolean, leadMinutes: Int) {
+        repository.updateNextClassNotificationSettings(enabled, leadMinutes)
+        _uiState.update {
+            it.copy(
+                isNextClassNotificationEnabled = enabled,
+                nextClassLeadMinutes = leadMinutes,
+                infoMessage = if (enabled) "次の授業開始の ${leadMinutes}分前に通知します" else "次の授業通知を無効にしました"
+            )
+        }
+    }
+
+    fun sendTestNextClassNotification() {
+        val success = NotificationHelper.showNextClassNotification(
+            getApplication(),
+            1,
+            LocalDate.now(),
+            isTest = true
+        )
+        if (!success) {
+            val schedule = repository.getDaySchedule(uiState.value.selectedClass, LocalDate.now(), LocalDate.now())
+            val firstActive = schedule.periods.firstOrNull { it.subject.isNotBlank() }?.period ?: 1
+            NotificationHelper.showNextClassNotification(
+                getApplication(),
+                firstActive,
+                LocalDate.now(),
+                isTest = true
+            )
+        }
+        _uiState.update { it.copy(infoMessage = "次の授業のテスト通知を送信しました") }
     }
 
     // 検索機能
@@ -775,19 +829,32 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { it.copy(infoMessage = null) }
     }
 
-    fun checkForAppUpdate() {
-        val updateInfo = repository.getLatestAppUpdateInfo() ?: return
+    fun checkForAppUpdate(manual: Boolean = false) {
+        val updateInfo = repository.getLatestAppUpdateInfo()
         val currentVersion = BuildConfig.VERSION_NAME.trim()
+
+        if (updateInfo == null) {
+            if (manual) {
+                _uiState.update {
+                    it.copy(infoMessage = "更新情報を取得できませんでした。時間割の更新（再同期）をお試しください。")
+                }
+            }
+            return
+        }
 
         if (updateInfo.isNewerThan(currentVersion)) {
             val ignoredVersion = repository.getIgnoredUpdateVersion()
-            if (ignoredVersion != updateInfo.version.trim()) {
+            if (manual || ignoredVersion != updateInfo.version.trim()) {
                 _uiState.update {
                     it.copy(
                         showAppUpdateDialog = true,
                         pendingAppUpdate = updateInfo
                     )
                 }
+            }
+        } else if (manual) {
+            _uiState.update {
+                it.copy(infoMessage = "お使いのアプリ (v$currentVersion) は最新バージョンです")
             }
         }
     }

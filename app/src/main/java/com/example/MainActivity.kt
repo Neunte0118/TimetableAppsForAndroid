@@ -37,6 +37,9 @@ class MainActivity : ComponentActivity() {
                     state.notificationMinute
                 )
             }
+            if (state.isNextClassNotificationEnabled) {
+                NotificationHelper.scheduleNextClassAlarms(applicationContext)
+            }
         }
     }
 
@@ -46,6 +49,7 @@ class MainActivity : ComponentActivity() {
 
         // Ensure notification channel is created
         NotificationHelper.createNotificationChannel(applicationContext)
+        NotificationHelper.scheduleNextClassAlarms(applicationContext)
 
         // Request notification permission if needed on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

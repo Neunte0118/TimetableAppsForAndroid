@@ -193,5 +193,47 @@ class ExampleRobolectricTest {
       }
     }
   }
+
+  @Test
+  fun `verify next class notification format and options`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val repo = TimetableRepository.getInstance(context)
+
+    // Default lead minutes should be 5
+    assertEquals(5, repo.nextClassLeadMinutes.value)
+    assertTrue(repo.isNextClassNotificationEnabled.value)
+
+    // Update settings to 10 minutes
+    repo.updateNextClassNotificationSettings(true, 10)
+    assertEquals(10, repo.nextClassLeadMinutes.value)
+
+    // Invalid lead minutes coerced to 5
+    repo.updateNextClassNotificationSettings(true, 99)
+    assertEquals(5, repo.nextClassLeadMinutes.value)
+
+    // Test sending notification with isTest = true
+    val result = com.example.notification.NotificationHelper.showNextClassNotification(
+      context,
+      period = 1,
+      date = LocalDate.of(2026, 9, 14), // Monday
+      isTest = true
+    )
+    assertTrue(result)
+
+    // Verify weekend is considered holiday and prevents notification
+    val sunday = LocalDate.of(2026, 9, 13) // Sunday
+    assertTrue(com.example.notification.NotificationHelper.isHoliday(sunday, repo))
+    val weekendResult = com.example.notification.NotificationHelper.showNextClassNotification(
+      context,
+      period = 1,
+      date = sunday,
+      isTest = false
+    )
+    assertEquals(false, weekendResult)
+
+    // Verify schedule and cancel alarms run without error
+    com.example.notification.NotificationHelper.scheduleNextClassAlarms(context)
+    com.example.notification.NotificationHelper.cancelNextClassAlarms(context)
+  }
 }
 

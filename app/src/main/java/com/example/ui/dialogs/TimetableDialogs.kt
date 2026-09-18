@@ -2403,13 +2403,19 @@ fun NotificationSettingsDialog(
     isNotificationEnabled: Boolean,
     notificationHour: Int,
     notificationMinute: Int,
+    isNextClassNotificationEnabled: Boolean,
+    nextClassLeadMinutes: Int,
     onUpdateNotificationSettings: (Boolean, Int, Int) -> Unit,
+    onUpdateNextClassNotificationSettings: (Boolean, Int) -> Unit,
     onTestSendNotification: () -> Unit,
+    onTestSendNextClassNotification: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var notifEnabled by remember(isNotificationEnabled) { mutableStateOf(isNotificationEnabled) }
     var notifHour by remember(notificationHour) { mutableStateOf(notificationHour) }
     var notifMinute by remember(notificationMinute) { mutableStateOf(notificationMinute) }
+    var nextClassEnabled by remember(isNextClassNotificationEnabled) { mutableStateOf(isNextClassNotificationEnabled) }
+    var leadMin by remember(nextClassLeadMinutes) { mutableStateOf(nextClassLeadMinutes) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2418,7 +2424,7 @@ fun NotificationSettingsDialog(
             Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         },
         title = {
-            Text("毎日の時間割通知設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("時間割・授業通知設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         },
         text = {
             Column(
@@ -2427,12 +2433,7 @@ fun NotificationSettingsDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    "指定した時刻に、当日の時間割（科目・移動教室）と行事予定を自動でお知らせします。",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+                // 1. 毎朝の時間割通知
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -2448,7 +2449,7 @@ fun NotificationSettingsDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text("毎朝の時間割通知", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(
                                     if (notifEnabled) "有効（毎朝 ${String.format("%02d:%02d", notifHour, notifMinute)} に通知）" else "無効",
@@ -2501,18 +2502,99 @@ fun NotificationSettingsDialog(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
+
+                            OutlinedButton(
+                                onClick = onTestSendNotification,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("今日の時間割テスト通知を送信", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
 
-                Button(
-                    onClick = onTestSendNotification,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                // 2. 次の授業の事前通知
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("今すぐ今日の時間割テスト通知を送信", fontSize = 13.sp)
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("次の授業の通知", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(
+                                    if (nextClassEnabled) "有効（授業開始の ${leadMin}分前に通知）" else "無効",
+                                    fontSize = 12.sp,
+                                    color = if (nextClassEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = nextClassEnabled,
+                                onCheckedChange = {
+                                    nextClassEnabled = it
+                                    onUpdateNextClassNotificationSettings(it, leadMin)
+                                }
+                            )
+                        }
+
+                        if (nextClassEnabled) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                            Text("通知タイミング（開始前）", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(3, 5, 10, 20).forEach { mins ->
+                                    val isSelected = (leadMin == mins)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            leadMin = mins
+                                            onUpdateNextClassNotificationSettings(nextClassEnabled, mins)
+                                        },
+                                        label = {
+                                            Text(
+                                                "${mins}分前",
+                                                fontSize = 12.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+
+                            Text(
+                                "※ 時刻表: 1限 8:30 / 2限 9:45 / 3限 11:00 / 4限 12:55 / 5限 14:10\n※ 休日や次の科目がない場合は通知されません。",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            OutlinedButton(
+                                onClick = onTestSendNextClassNotification,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("次の授業通知をテスト送信", fontSize = 12.sp)
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -3162,6 +3244,7 @@ fun OtherMenuModalSheet(
     onOpenNotificationSettings: () -> Unit,
     onOpenDeveloperMenu: () -> Unit,
     onOpenHistory: () -> Unit,
+    onCheckForAppUpdate: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenTerms: () -> Unit,
     onOpenReportExternal: () -> Unit,
@@ -3364,6 +3447,15 @@ fun OtherMenuModalSheet(
                 subtitle = "アプリのアップデート情報",
                 onClick = onOpenHistory,
                 testTag = "menu_history"
+            )
+
+            MenuSheetItem(
+                icon = Icons.Default.SystemUpdate,
+                iconTint = colorInfo,
+                title = "アプリの更新を確認",
+                subtitle = "現在のバージョン: v${com.example.BuildConfig.VERSION_NAME}",
+                onClick = onCheckForAppUpdate,
+                testTag = "menu_check_app_update"
             )
 
             MenuSheetItem(

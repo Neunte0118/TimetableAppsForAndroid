@@ -19,6 +19,9 @@ class DailyTimetableReceiver : BroadcastReceiver() {
             NotificationHelper.scheduleDailyNotification(context, hour, minute)
         }
 
+        // Schedule next class alarms for today if enabled
+        NotificationHelper.scheduleNextClassAlarms(context)
+
         // Always refresh widgets for the new day
         try {
             com.example.widget.TimetableWidgetProvider.updateAllWidgets(context)

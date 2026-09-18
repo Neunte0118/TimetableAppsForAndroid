@@ -67,6 +67,12 @@ class TimetableRepository(private val context: Context) {
     private val _notificationMinute = MutableStateFlow(loadNotificationMinute())
     val notificationMinute: StateFlow<Int> = _notificationMinute.asStateFlow()
 
+    private val _isNextClassNotificationEnabled = MutableStateFlow(loadNextClassNotificationEnabled())
+    val isNextClassNotificationEnabled: StateFlow<Boolean> = _isNextClassNotificationEnabled.asStateFlow()
+
+    private val _nextClassLeadMinutes = MutableStateFlow(loadNextClassLeadMinutes())
+    val nextClassLeadMinutes: StateFlow<Int> = _nextClassLeadMinutes.asStateFlow()
+
     val csvUrlsConfig: StateFlow<CsvUrlsConfig> = csvSyncManager.urlsConfig
     val csvSyncStatus: StateFlow<CsvSyncStatus> = csvSyncManager.syncStatus
 
@@ -327,6 +333,32 @@ class TimetableRepository(private val context: Context) {
         NotificationHelper.showTodayTimetableNotification(context)
     }
 
+    private fun loadNextClassNotificationEnabled(): Boolean {
+        return prefs.getBoolean("next_class_notification_enabled", true)
+    }
+
+    private fun loadNextClassLeadMinutes(): Int {
+        val saved = prefs.getInt("next_class_lead_minutes", 5)
+        return if (saved in listOf(3, 5, 10, 20)) saved else 5
+    }
+
+    fun updateNextClassNotificationSettings(enabled: Boolean, leadMinutes: Int) {
+        val validLead = if (leadMinutes in listOf(3, 5, 10, 20)) leadMinutes else 5
+        prefs.edit()
+            .putBoolean("next_class_notification_enabled", enabled)
+            .putInt("next_class_lead_minutes", validLead)
+            .apply()
+
+        _isNextClassNotificationEnabled.value = enabled
+        _nextClassLeadMinutes.value = validLead
+
+        if (enabled) {
+            NotificationHelper.scheduleNextClassAlarms(context)
+        } else {
+            NotificationHelper.cancelNextClassAlarms(context)
+        }
+    }
+
     fun saveCsvUrls(config: CsvUrlsConfig) {
         csvSyncManager.saveUrlsConfig(config)
     }
@@ -399,6 +431,9 @@ class TimetableRepository(private val context: Context) {
         // When initial setup completes, enable notification if not already
         if (completed && _isDailyNotificationEnabled.value) {
             NotificationHelper.scheduleDailyNotification(context, _notificationHour.value, _notificationMinute.value)
+        }
+        if (completed && _isNextClassNotificationEnabled.value) {
+            NotificationHelper.scheduleNextClassAlarms(context)
         }
         TimetableWidgetProvider.updateAllWidgets(context)
         EventMemoWidgetProvider.updateAllWidgets(context)
