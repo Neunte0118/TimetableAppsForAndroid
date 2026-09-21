@@ -4,24 +4,27 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="5dp">
+    android:paddingStart="6dp"
+    android:paddingTop="3dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="3dp">
 
     <!-- Compact Header: [<] [Date] [>] [Home] -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="22dp"
         android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingBottom="3dp">
+        android:orientation="horizontal">
 
         <ImageView
             android:id="@+id/widget_em_btn_prev"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:background="@drawable/widget_nav_btn_bg"
             android:contentDescription="前日"
-            android:padding="5dp"
+            android:padding="4dp"
             android:src="@drawable/ic_widget_chevron_left" />
 
         <TextView
@@ -34,28 +37,29 @@
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
+            android:singleLine="true"
             android:text="今日"
             android:textColor="@color/widget_text_primary"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:textStyle="bold" />
 
         <ImageView
             android:id="@+id/widget_em_btn_next"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:background="@drawable/widget_nav_btn_bg"
             android:contentDescription="翌日"
-            android:padding="5dp"
+            android:padding="4dp"
             android:src="@drawable/ic_widget_chevron_right" />
 
         <ImageView
             android:id="@+id/widget_em_btn_home"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_marginStart="4dp"
             android:background="@drawable/widget_home_bg"
             android:contentDescription="今日に戻る"
-            android:padding="5dp"
+            android:padding="4dp"
             android:src="@drawable/ic_widget_home" />
     </LinearLayout>
 
@@ -67,7 +71,6 @@
         android:layout_weight="1"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="4dp"
         android:visibility="gone">
 
         <TextView
@@ -77,101 +80,97 @@
             android:gravity="center"
             android:text="初期設定を完了させてください"
             android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp" />
+            android:textSize="10.5sp" />
     </LinearLayout>
 
-    <!-- Content: 2 horizontal rows (Top: 行事, Bottom: メモ) -->
+    <!-- Content: Vertical stack containing 行事 (top) and メモ (bottom) -->
     <LinearLayout
         android:id="@+id/widget_em_content_container"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="2dp"
         android:layout_weight="1"
-        android:gravity="center_vertical"
         android:orientation="vertical">
 
-        <!-- 行事 Row: [Icon] 行事   体育祭 -->
+        <!-- 行事: [Icon] 行事   体育祭 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginBottom="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_event_section_bg"
+            android:background="@drawable/widget_event_section_compact_bg"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp">
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp">
 
             <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
                 android:contentDescription="行事"
                 android:src="@drawable/ic_widget_event" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="3dp"
                 android:text="行事"
                 android:textColor="@color/widget_event_title"
-                android:textSize="11.5sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_em_event_content"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:singleLine="true"
                 android:text="なし"
                 android:textColor="@color/widget_event_text"
-                android:textSize="11.5sp" />
+                android:textSize="10.5sp" />
         </LinearLayout>
 
-        <!-- メモ Row: [Icon] メモ   なし -->
+        <!-- メモ: [Icon] メモ   なし -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_memo_section_bg"
+            android:background="@drawable/widget_memo_section_compact_bg"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp">
+            android:paddingStart="5dp"
+            android:paddingEnd="5dp">
 
             <ImageView
-                android:layout_width="14dp"
-                android:layout_height="14dp"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
                 android:contentDescription="メモ"
                 android:src="@drawable/ic_widget_note" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="3dp"
                 android:text="メモ"
                 android:textColor="@color/widget_memo_title"
-                android:textSize="11.5sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_em_memo_content"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:singleLine="true"
                 android:text="なし"
                 android:textColor="@color/widget_memo_text"
-                android:textSize="11.5sp" />
+                android:textSize="10.5sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

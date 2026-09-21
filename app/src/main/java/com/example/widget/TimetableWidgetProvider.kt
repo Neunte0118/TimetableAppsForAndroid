@@ -412,9 +412,20 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                             if (hasValidSubject(cell?.subject)) {
                                 val subjectName = cell!!.subject.trim()
                                 views.setTextViewText(periodSubjects[i], subjectName)
-                                views.setTextViewText(periodRooms[i], cell.classroom.ifBlank { "" })
 
-                                if (isColorEnabled) {
+                                val roomOrTime = when {
+                                    cell.isExam && cell.startTime.isNotBlank() && cell.endTime.isNotBlank() ->
+                                        "${cell.startTime}-${cell.endTime}"
+                                    cell.isExam && cell.startTime.isNotBlank() -> cell.startTime
+                                    else -> cell.classroom.ifBlank { "" }
+                                }
+                                views.setTextViewText(periodRooms[i], roomOrTime)
+
+                                if (cell.isUnselectedElective) {
+                                    views.setTextColor(periodSubjects[i], 0xFF64748B.toInt()) // Gray
+                                } else if (cell.isExam) {
+                                    views.setTextColor(periodSubjects[i], 0xFF6B21A8.toInt()) // Purple
+                                } else if (isColorEnabled) {
                                     val colorLong = com.example.model.SubjectColorDefaults.getColorForSubject(subjectName, colorGroups)
                                     views.setTextColor(periodSubjects[i], colorLong.toInt())
                                 } else {
@@ -427,10 +438,11 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                 views.setTextViewText(periodRooms[i], "")
                             }
 
-                            val bgRes = if (repo.isHighlightChangedPeriods.value && cell?.isChanged == true) {
-                                R.drawable.widget_period_cell_changed_bg
-                            } else {
-                                R.drawable.widget_period_cell_bg
+                            val bgRes = when {
+                                cell?.isUnselectedElective == true -> R.drawable.widget_period_cell_unselected_bg
+                                cell?.isExam == true -> R.drawable.widget_period_cell_exam_bg
+                                repo.isHighlightChangedPeriods.value && cell?.isChanged == true -> R.drawable.widget_period_cell_changed_bg
+                                else -> R.drawable.widget_period_cell_bg
                             }
                             views.setInt(periodContainers[i], "setBackgroundResource", bgRes)
                         }

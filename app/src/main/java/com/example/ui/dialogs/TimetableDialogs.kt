@@ -1855,6 +1855,36 @@ fun ElectiveDropdownField(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
             ) {
+                // 「未選択（クリア）」オプション
+                val isNoneSelected = selectedChoice.isBlank()
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (isNoneSelected) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Text(
+                                text = "未選択（指定なし）",
+                                fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isNoneSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    onClick = {
+                        onOptionSelected("")
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                )
+
                 sortedOptions.forEach { option ->
                     val isSelected = option == selectedChoice
                     DropdownMenuItem(
@@ -1990,6 +2020,8 @@ fun DeveloperMenuDialog(
     var holidaysUrl by remember(initialConfig) { mutableStateOf(initialConfig.holidaysUrl) }
     var timetableChangeSheetUrl by remember(initialConfig) { mutableStateOf(initialConfig.timetableChangeSheetUrl) }
     var courseChangeSheetUrl by remember(initialConfig) { mutableStateOf(initialConfig.courseChangeSheetUrl) }
+    var examScheduleUrl by remember(initialConfig) { mutableStateOf(initialConfig.examScheduleUrl) }
+    var subjectMappingUrl by remember(initialConfig) { mutableStateOf(initialConfig.subjectMappingUrl) }
     var reportUrl by remember(initialConfig) { mutableStateOf(initialConfig.reportUrl) }
     var timetableChangeUrl by remember(initialConfig) { mutableStateOf(initialConfig.timetableChangeUrl) }
 
@@ -2115,6 +2147,8 @@ fun DeveloperMenuDialog(
                                         holidaysUrl = def.holidaysUrl
                                         timetableChangeSheetUrl = def.timetableChangeSheetUrl
                                         courseChangeSheetUrl = def.courseChangeSheetUrl
+                                        examScheduleUrl = def.examScheduleUrl
+                                        subjectMappingUrl = def.subjectMappingUrl
                                         reportUrl = def.reportUrl
                                         timetableChangeUrl = def.timetableChangeUrl
                                         onResetToDefaultUrls()
@@ -2137,6 +2171,8 @@ fun DeveloperMenuDialog(
                                         holidaysUrl = ""
                                         timetableChangeSheetUrl = ""
                                         courseChangeSheetUrl = ""
+                                        examScheduleUrl = ""
+                                        subjectMappingUrl = ""
                                     },
                                     contentPadding = PaddingValues(vertical = 6.dp, horizontal = 8.dp)
                                 ) {
@@ -2226,6 +2262,26 @@ fun DeveloperMenuDialog(
                                 modifier = Modifier.fillMaxWidth().testTag("input_course_change_sheet_url")
                             )
 
+                            // 9. 考査時間割 URL
+                            OutlinedTextField(
+                                value = examScheduleUrl,
+                                onValueChange = { examScheduleUrl = it },
+                                label = { Text("9. 考査時間割 CSV URL", fontSize = 11.sp) },
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_exam_schedule_url")
+                            )
+
+                            // 10. 科目名対応表 (マッピング) CSV URL
+                            OutlinedTextField(
+                                value = subjectMappingUrl,
+                                onValueChange = { subjectMappingUrl = it },
+                                label = { Text("10. 科目名対応表 CSV URL", fontSize = 11.sp) },
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_subject_mapping_url")
+                            )
+
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                             Text("【外部リンク設定】", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
@@ -2285,6 +2341,7 @@ fun DeveloperMenuDialog(
                                     Text("・祝日データ: ${syncStatus.holidayCount}件", fontSize = 11.5.sp)
                                     Text("・時間割変更データ: ${syncStatus.timetableChangeCount}件", fontSize = 11.5.sp)
                                     Text("・講座変更データ: ${syncStatus.courseChangeCount}件", fontSize = 11.5.sp)
+                                    Text("・考査時間割データ: ${syncStatus.examCount}件", fontSize = 11.5.sp)
                                     Text("・更新履歴データ: ${syncStatus.updateCount}件", fontSize = 11.5.sp)
                                     if (syncStatus.lastSyncTime != null) {
                                         Text("・最終同期時刻: ${syncStatus.lastSyncTime}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -2344,6 +2401,8 @@ fun DeveloperMenuDialog(
                                 holidaysUrl = holidaysUrl,
                                 timetableChangeSheetUrl = timetableChangeSheetUrl,
                                 courseChangeSheetUrl = courseChangeSheetUrl,
+                                examScheduleUrl = examScheduleUrl,
+                                subjectMappingUrl = subjectMappingUrl,
                                 reportUrl = reportUrl,
                                 timetableChangeUrl = timetableChangeUrl
                             )

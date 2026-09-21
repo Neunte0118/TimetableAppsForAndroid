@@ -277,9 +277,27 @@ fun TimetableTable(
                                 // 背景色の計算（ダークモード・ライトモードで明瞭なコントラストを確保）
                                 val baseCellColor = periodSchedule.getComposeColor(cellColorMode)
                                 val isChangedActive = periodSchedule.isChanged && isHighlightChangedPeriods && hasContent
+                                val isExamActive = periodSchedule.isExam && hasContent
+                                val isUnselectedActive = periodSchedule.isUnselectedElective && hasContent
 
                                 val surfaceBgColor = when {
-                                    // 授業変更がありハイライト有効な場合
+                                    // 1. 未選択科目・自分の選択科目でない科目（灰色、ダークテーマでは明度を変える）
+                                    isUnselectedActive -> {
+                                        if (isDark) {
+                                            if (isSelectedCol) Color(0xFF424242) else Color(0xFF303030)
+                                        } else {
+                                            if (isSelectedCol) Color(0xFFE0E0E0) else Color(0xFFEEEEEE)
+                                        }
+                                    }
+                                    // 2. 考査：通常科目（紫色）
+                                    isExamActive -> {
+                                        if (isDark) {
+                                            if (isSelectedCol) Color(0xFF4A148C).copy(alpha = 0.7f) else Color(0xFF311B92).copy(alpha = 0.55f)
+                                        } else {
+                                            if (isSelectedCol) Color(0xFFD1C4E9).copy(alpha = 0.85f) else Color(0xFFEDE7F6)
+                                        }
+                                    }
+                                    // 3. 授業変更がありハイライト有効な場合
                                     isChangedActive -> {
                                         if (isDark) {
                                             if (isSelectedCol) Color(0xFF5D4037) else Color(0xFF3E2723)
@@ -307,7 +325,15 @@ fun TimetableTable(
 
                                 // テキスト色の計算（教科色分け・ダークテーマ・時間割変更時の視認性を完全保証）
                                 val calculatedTextColor = when {
-                                    // 1. 時間割変更コマ（色分けOFF時はダーク/ライトに合わせた高コントラスト文字色）
+                                    // 1. 未選択科目・自分の選択科目でない科目（灰色）
+                                    isUnselectedActive -> {
+                                        if (isDark) Color(0xFF9E9E9E) else Color(0xFF757575)
+                                    }
+                                    // 2. 考査：通常科目（紫色）
+                                    isExamActive -> {
+                                        if (isDark) Color(0xFFEDE7F6) else Color(0xFF4A148C)
+                                    }
+                                    // 3. 時間割変更コマ（色分けOFF時はダーク/ライトに合わせた高コントラスト文字色）
                                     isChangedActive -> {
                                         if (isSubjectColorEnabled && viewMode == TimetableViewMode.TIMETABLE && periodSchedule.subject.isNotBlank()) {
                                             val colorLong = SubjectColorDefaults.getColorForSubject(periodSchedule.subject, subjectColorGroups)
@@ -316,15 +342,21 @@ fun TimetableTable(
                                             if (isDark) Color(0xFFFFD54F) else Color(0xFFBF360C)
                                         }
                                     }
-                                    // 2. 教科色分け有効時
+                                    // 4. 教科色分け有効時
                                     viewMode == TimetableViewMode.TIMETABLE && isSubjectColorEnabled && periodSchedule.subject.isNotBlank() -> {
                                         val colorLong = SubjectColorDefaults.getColorForSubject(periodSchedule.subject, subjectColorGroups)
                                         Color(colorLong)
                                     }
-                                    // 3. 通常文字色
+                                    // 5. 通常文字色
                                     else -> {
                                         MaterialTheme.colorScheme.onSurface
                                     }
+                                }
+
+                                val examTimeTextColor = when {
+                                    isUnselectedActive -> if (isDark) Color(0xFF757575) else Color(0xFF9E9E9E)
+                                    isDark -> Color(0xFFD1C4E9)
+                                    else -> Color(0xFF5E35B1)
                                 }
 
                                 val targetSp = if (viewMode == TimetableViewMode.TIMETABLE) {
@@ -339,13 +371,17 @@ fun TimetableTable(
                                     daySchedules.size >= 4 -> 0.3f
                                     else -> 0f
                                 }
-                                val charLengthPenalty = if (cellContent.length >= 7 && daySchedules.size >= 6) 1.2f
-                                else if (cellContent.length >= 5 && daySchedules.size >= 6) 0.6f
-                                else 0f
+                                val charLengthPenalty = when {
+                                    cellContent.length >= 7 && daySchedules.size >= 6 -> 1.2f
+                                    cellContent.length >= 5 && daySchedules.size >= 6 -> 0.6f
+                                    else -> 0f
+                                }
 
-                                val finalFontSize = (targetSp - colScale - charLengthPenalty).coerceAtLeast(9.5f).sp
+                                val finalFontSize = (targetSp - colScale - charLengthPenalty).coerceAtLeast(8.5f).sp
 
                                 val cellBorder = when {
+                                    isUnselectedActive -> BorderStroke(1.dp, if (isDark) Color(0xFF616161) else Color(0xFFBDBDBD))
+                                    isExamActive -> BorderStroke(1.5.dp, if (isDark) Color(0xFFCE93D8) else Color(0xFF7E57C2))
                                     isChangedActive -> BorderStroke(1.5.dp, if (isDark) Color(0xFFFFB74D) else Color(0xFFFF8F00))
                                     isSelectedCol -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
                                     hasContent -> BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
@@ -362,20 +398,49 @@ fun TimetableTable(
                                         .testTag("cell_${schedule.date}_$period")
                                 ) {
                                     Box(
-                                        contentAlignment = Alignment.Center,
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .padding(horizontal = 1.5.dp, vertical = 1.5.dp)
+                                            .padding(horizontal = 2.dp, vertical = 2.dp)
                                     ) {
+                                        // 考査開始時間（左上）
+                                        if (periodSchedule.isExam && periodSchedule.startTime.isNotBlank()) {
+                                            Text(
+                                                text = periodSchedule.startTime,
+                                                fontSize = 7.5.sp,
+                                                lineHeight = 8.5.sp,
+                                                color = examTimeTextColor,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .align(Alignment.TopStart)
+                                                    .padding(start = 1.dp, top = 1.dp)
+                                            )
+                                        }
+
+                                        // 考査終了時間（左下）
+                                        if (periodSchedule.isExam && periodSchedule.endTime.isNotBlank()) {
+                                            Text(
+                                                text = periodSchedule.endTime,
+                                                fontSize = 7.5.sp,
+                                                lineHeight = 8.5.sp,
+                                                color = examTimeTextColor,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomStart)
+                                                    .padding(start = 1.dp, bottom = 1.dp)
+                                            )
+                                        }
+
+                                        // 中央の教科・科目名
                                         Text(
                                             text = cellContent,
-                                            fontWeight = if (isSelectedCol || isChangedActive) FontWeight.Bold else FontWeight.Medium,
+                                            fontWeight = if (isSelectedCol || isChangedActive || (periodSchedule.isExam && !periodSchedule.isUnselectedElective)) FontWeight.Bold else FontWeight.Medium,
                                             fontSize = finalFontSize,
                                             lineHeight = (finalFontSize.value * 1.15f).sp,
                                             color = calculatedTextColor,
                                             textAlign = TextAlign.Center,
                                             maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.align(Alignment.Center)
                                         )
                                     }
                                 }

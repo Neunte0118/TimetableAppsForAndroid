@@ -400,14 +400,16 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                 val finalViews = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     RemoteViews(
                         mapOf(
-                            SizeF(100f, 40f) to compactViews,
-                            SizeF(100f, 110f) to regularViews
+                            SizeF(80f, 35f) to compactViews,
+                            SizeF(80f, 130f) to regularViews
                         )
                     )
                 } else {
                     val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
                     val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
-                    if (minHeight in 1..109) compactViews else regularViews
+                    val maxHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
+                    val effectiveHeight = if (minHeight > 0) minHeight else maxHeight
+                    if (effectiveHeight in 1..120 || effectiveHeight == 0) compactViews else regularViews
                 }
 
                 appWidgetManager.updateAppWidget(appWidgetId, finalViews)

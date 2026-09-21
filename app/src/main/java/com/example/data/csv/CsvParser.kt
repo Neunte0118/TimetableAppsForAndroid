@@ -384,4 +384,140 @@ object CsvParser {
         }
         return list
     }
+
+    // 9. Parse 考査時間割
+    // Headers: dates, periods, subjects, start_time, end_time, classroom
+    fun parseExamSchedule(csvText: String): List<ExamScheduleRow> {
+        val rows = parseRawCsv(csvText)
+        if (rows.isEmpty()) return emptyList()
+
+        val list = mutableListOf<ExamScheduleRow>()
+        val header = rows.first()
+        val hasHeader = header.any { h ->
+            val lower = h.lowercase()
+            lower.contains("date") || lower.contains("日付") ||
+            lower.contains("period") || lower.contains("時限") || lower.contains("限") ||
+            lower.contains("subject") || lower.contains("科目") ||
+            lower.contains("start") || lower.contains("開始") ||
+            lower.contains("考査") || lower.contains("class") || lower.contains("クラス")
+        }
+
+        var dateIdx = 0
+        var classIdx = -1
+        var periodIdx = 1
+        var subjectIdx = 2
+        var startIdx = 3
+        var endIdx = 4
+        var roomIdx = 5
+
+        val startRowIdx = if (hasHeader) {
+            // ヘッダー名から動的にカラム位置をマッピング
+            var foundDate = false
+            var foundClass = false
+            var foundPeriod = false
+            var foundSubject = false
+            var foundStart = false
+            var foundEnd = false
+            var foundRoom = false
+
+            for (c in header.indices) {
+                val col = header[c].lowercase()
+                if (!foundDate && (col.contains("date") || col.contains("日付") || col.contains("日"))) {
+                    dateIdx = c
+                    foundDate = true
+                } else if (!foundPeriod && (col.contains("period") || col.contains("時限") || col.contains("限"))) {
+                    periodIdx = c
+                    foundPeriod = true
+                } else if (!foundSubject && (col.contains("subject") || col.contains("科目") || col.contains("教科") || col.contains("コース"))) {
+                    subjectIdx = c
+                    foundSubject = true
+                } else if (!foundStart && (col.contains("start") || col.contains("開始") || col.contains("自"))) {
+                    startIdx = c
+                    foundStart = true
+                } else if (!foundEnd && (col.contains("end") || col.contains("終了") || col.contains("至"))) {
+                    endIdx = c
+                    foundEnd = true
+                } else if (!foundRoom && (col.contains("room") || col.contains("教室") || col.contains("場所"))) {
+                    roomIdx = c
+                    foundRoom = true
+                } else if (!foundClass && (col.contains("class") || col.contains("クラス") || col.contains("組"))) {
+                    classIdx = c
+                    foundClass = true
+                }
+            }
+            1
+        } else {
+            0
+        }
+
+        for (i in startRowIdx until rows.size) {
+            val row = rows[i]
+            if (row.isEmpty()) continue
+            val dateStr = row.getOrNull(dateIdx)?.trim() ?: ""
+            val (m, d) = parseMonthDay(dateStr) ?: continue
+
+            val periodStr = row.getOrNull(periodIdx)?.trim() ?: "1"
+            val period = periodStr.filter { it.isDigit() }.toIntOrNull() ?: 1
+            val subject = row.getOrNull(subjectIdx)?.trim() ?: ""
+            val startTime = row.getOrNull(startIdx)?.trim() ?: ""
+            val endTime = row.getOrNull(endIdx)?.trim() ?: ""
+            val classroom = if (roomIdx >= 0) row.getOrNull(roomIdx)?.trim() ?: "" else ""
+            val classId = if (classIdx >= 0) row.getOrNull(classIdx)?.trim() ?: "全" else "全"
+
+            if (subject.isNotBlank()) {
+                list.add(
+                    ExamScheduleRow(
+                        dateStr = dateStr,
+                        month = m,
+                        day = d,
+                        period = period,
+                        subject = subject,
+                        startTime = startTime,
+                        endTime = endTime,
+                        classroom = classroom,
+                        classId = if (classId.isNotBlank()) classId else "全"
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    /**
+     * 10. 科目名対応表（source -> target）のパース
+     */
+    fun parseSubjectMapping(csvContent: String): List<SubjectMappingRow> {
+        val list = mutableListOf<SubjectMappingRow>()
+        val rows = parseRawCsv(csvContent)
+        if (rows.isEmpty()) return list
+
+        val firstRow = rows[0].map { it.lowercase().trim() }
+        var sourceIdx = 0
+        var targetIdx = 1
+
+        val hasHeader = firstRow.any { it.contains("source") || it.contains("target") || it.contains("元") || it.contains("先") }
+        val startRowIdx = if (hasHeader) {
+            firstRow.forEachIndexed { c, col ->
+                if (col.contains("source") || col.contains("元") || col.contains("講座")) {
+                    sourceIdx = c
+                } else if (col.contains("target") || col.contains("先") || col.contains("科目") || col.contains("正式")) {
+                    targetIdx = c
+                }
+            }
+            1
+        } else {
+            0
+        }
+
+        for (i in startRowIdx until rows.size) {
+            val row = rows[i]
+            if (row.isEmpty()) continue
+            val source = row.getOrNull(sourceIdx)?.trim() ?: ""
+            val target = row.getOrNull(targetIdx)?.trim() ?: ""
+            if (source.isNotBlank() && target.isNotBlank()) {
+                list.add(SubjectMappingRow(source = source, target = target))
+            }
+        }
+        return list
+    }
 }

@@ -132,6 +132,27 @@ data class CourseChangeNotificationRow(
     val newCourse: String      // 変更後の講座名 (例: 化S③)
 )
 
+// 9. 考査時間割
+// dates, periods, subjects, start_time, end_time, classroom
+data class ExamScheduleRow(
+    val dateStr: String,
+    val month: Int,
+    val day: Int,
+    val period: Int,           // 1 ~ 7
+    val subject: String,       // 考査科目名
+    val startTime: String,     // 開始時間 (例: 8:50)
+    val endTime: String,       // 終了時間 (例: 9:40)
+    val classroom: String = "",// 教室（省略時は通常教室または空）
+    val classId: String = "全" // クラスに関係なくテストがあるため原則不要（互換用デフォルト"全"）
+)
+
+// 10. 科目名対応表 (source -> target)
+// source, target
+data class SubjectMappingRow(
+    val source: String, // 選択科目の講座記号 (例: ⅡLa①, 世特①, 生S①)
+    val target: String  // 考査科目名・正式名称 (例: 数学ⅡL, 世界史特講, 生物講究)
+)
+
 /**
  * 外部CSV URL設定及び連携リンク設定
  */
@@ -144,6 +165,8 @@ data class CsvUrlsConfig(
     val holidaysUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=652046519&single=true&output=csv",
     val timetableChangeSheetUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiStJCsPKp1ndi958BLOajBqizE_aIcO2Z0f9hPgiyPV19rnWB3qVcrLuVEaeCeE5ddaIudtX7VkzE/pub?gid=1149682638&single=true&output=csv",
     val courseChangeSheetUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiStJCsPKp1ndi958BLOajBqizE_aIcO2Z0f9hPgiyPV19rnWB3qVcrLuVEaeCeE5ddaIudtX7VkzE/pub?gid=1592703701&single=true&output=csv",
+    val examScheduleUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=436772895&single=true&output=csv",
+    val subjectMappingUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=1612164498&single=true&output=csv",
     val reportUrl: String = "https://forms.gle/KiiEAds2vtjAmsZ97",
     val timetableChangeUrl: String = "https://docs.google.com/forms/d/e/1FAIpQLSfTOKMLJz896qfq7OKSv7TRwxxJxX4VIqXT4npLcGmqWNyBkg/viewform?usp=preview"
 )
@@ -163,5 +186,7 @@ data class CsvSyncStatus(
     val holidayCount: Int = 0,
     val updateCount: Int = 0,
     val timetableChangeCount: Int = 0,
-    val courseChangeCount: Int = 0
+    val courseChangeCount: Int = 0,
+    val examCount: Int = 0,
+    val subjectMappingCount: Int = 0
 )

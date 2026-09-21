@@ -15,6 +15,10 @@
     <color name="widget_card_border">#E2E8F0</color>
     <color name="widget_card_changed_bg">#FFFBEB</color>
     <color name="widget_card_changed_border">#F59E0B</color>
+    <color name="widget_card_exam_bg">#F3E8FF</color>
+    <color name="widget_card_exam_border">#9333EA</color>
+    <color name="widget_card_unselected_bg">#F1F5F9</color>
+    <color name="widget_card_unselected_border">#94A3B8</color>
     <color name="widget_text_primary">#0F172A</color>
     <color name="widget_text_secondary">#334155</color>
     <color name="widget_text_muted">#64748B</color>
