@@ -773,7 +773,7 @@ fun SelectedDayEventMemoSection(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (eventText.isNotBlank()) eventText else "ここには何もないようです:(",
+                        text = if (eventText.isNotBlank()) eventText else "行事はありません",
                         fontSize = 13.sp,
                         fontWeight = if (eventText.isNotBlank()) FontWeight.Medium else FontWeight.Normal,
                         color = if (eventText.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
