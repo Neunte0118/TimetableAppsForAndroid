@@ -7,9 +7,17 @@
     <color name="widget_card_border">#334155</color>
     <color name="widget_card_changed_bg">#3D2506</color>
     <color name="widget_card_changed_border">#FBBF24</color>
+    <color name="widget_card_exam_bg">#2E1065</color>
+    <color name="widget_card_exam_border">#A855F7</color>
+    <color name="widget_card_unselected_bg">#1E293B</color>
+    <color name="widget_card_unselected_border">#475569</color>
     <color name="widget_text_primary">#F8FAFC</color>
     <color name="widget_text_secondary">#CBD5E1</color>
     <color name="widget_text_muted">#94A3B8</color>
+    <color name="widget_text_exam">#E9D5FF</color>
+    <color name="widget_text_exam_room">#D1C4E9</color>
+    <color name="widget_text_unselected">#94A3B8</color>
+    <color name="widget_text_changed">#FDE68A</color>
     <color name="widget_nav_btn_bg">#334155</color>
     <color name="widget_nav_btn_icon">#F1F5F9</color>
     <color name="widget_refresh_btn_bg">#312E81</color>

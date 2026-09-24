@@ -413,23 +413,28 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                 val subjectName = cell!!.subject.trim()
                                 views.setTextViewText(periodSubjects[i], subjectName)
 
-                                val roomOrTime = when {
-                                    cell.isExam && cell.startTime.isNotBlank() && cell.endTime.isNotBlank() ->
-                                        "${cell.startTime}-${cell.endTime}"
-                                    cell.isExam && cell.startTime.isNotBlank() -> cell.startTime
-                                    else -> cell.classroom.ifBlank { "" }
-                                }
-                                views.setTextViewText(periodRooms[i], roomOrTime)
+                                val roomText = cell.classroom.ifBlank { "" }
+                                views.setTextViewText(periodRooms[i], roomText)
+
+                                val defaultRoomColor = context.getColor(R.color.widget_text_muted)
+                                val examRoomColor = context.getColor(R.color.widget_text_exam_room)
 
                                 if (cell.isUnselectedElective) {
-                                    views.setTextColor(periodSubjects[i], 0xFF64748B.toInt()) // Gray
+                                    views.setTextColor(periodSubjects[i], context.getColor(R.color.widget_text_unselected))
+                                    views.setTextColor(periodRooms[i], defaultRoomColor)
                                 } else if (cell.isExam) {
-                                    views.setTextColor(periodSubjects[i], 0xFF6B21A8.toInt()) // Purple
+                                    views.setTextColor(periodSubjects[i], context.getColor(R.color.widget_text_exam))
+                                    views.setTextColor(periodRooms[i], examRoomColor)
                                 } else if (isColorEnabled) {
                                     val colorLong = com.example.model.SubjectColorDefaults.getColorForSubject(subjectName, colorGroups)
                                     views.setTextColor(periodSubjects[i], colorLong.toInt())
+                                    views.setTextColor(periodRooms[i], defaultRoomColor)
+                                } else if (repo.isHighlightChangedPeriods.value && cell.isChanged) {
+                                    views.setTextColor(periodSubjects[i], context.getColor(R.color.widget_text_changed))
+                                    views.setTextColor(periodRooms[i], defaultRoomColor)
                                 } else {
                                     views.setTextColor(periodSubjects[i], defaultSubjectColor)
+                                    views.setTextColor(periodRooms[i], defaultRoomColor)
                                 }
                             } else {
                                 // 間の空きコマにはハイフンを表示

@@ -430,6 +430,29 @@ fun TimetableTable(
                                             )
                                         }
 
+                                        // 考査教室・サブ情報（右上）
+                                        if (periodSchedule.isExam) {
+                                            val cornerText = if (viewMode == TimetableViewMode.TIMETABLE) {
+                                                periodSchedule.classroom
+                                            } else {
+                                                periodSchedule.subject
+                                            }
+                                            if (cornerText.isNotBlank()) {
+                                                Text(
+                                                    text = cornerText,
+                                                    fontSize = 7.5.sp,
+                                                    lineHeight = 8.5.sp,
+                                                    color = examTimeTextColor,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(end = 1.dp, top = 1.dp)
+                                                )
+                                            }
+                                        }
+
                                         // 中央の教科・科目名
                                         Text(
                                             text = cellContent,

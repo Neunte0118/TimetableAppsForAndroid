@@ -193,4 +193,118 @@ class ExamScheduleCsvTest {
         assertTrue(scheduleOtherChosen.isExam)
         assertTrue(scheduleOtherChosen.isUnselectedElective)
     }
+
+    @Test
+    fun testExamScheduleWithClassroomsAndHrSpecialCase() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = CsvSyncManager(context)
+        val classGroup3 = com.example.model.ClassGroup(id = "3", name = "3組", grade = 3, section = "3")
+        val classGroup4 = com.example.model.ClassGroup(id = "4", name = "4組", grade = 3, section = "4")
+
+        // User's exact prompt format:
+        // dates periods subjects start_time end_time classroom
+        // 9月25日 1 日特① 8:40 9:30 3組
+        // 9月25日 1 日特② 8:40 9:30 4組
+        // 9月25日 2 英語W 9:45 10:55 $hr
+        val examCsv = """
+            dates periods subjects start_time end_time classroom
+            9月25日 1 日特① 8:40 9:30 3組
+            9月25日 1 日特② 8:40 9:30 4組
+            9月25日 2 英語W 9:45 10:55 ${'$'}hr
+        """.trimIndent()
+
+        val parsed = CsvParser.parseExamSchedule(examCsv)
+        assertEquals(3, parsed.size)
+        assertEquals("日特①", parsed[0].subject)
+        assertEquals("3組", parsed[0].classroom)
+        assertEquals("8:40", parsed[0].startTime)
+        assertEquals("9:30", parsed[0].endTime)
+
+        assertEquals("日特②", parsed[1].subject)
+        assertEquals("4組", parsed[1].classroom)
+
+        assertEquals("英語W", parsed[2].subject)
+        assertEquals("${'$'}hr", parsed[2].classroom)
+        assertEquals("9:45", parsed[2].startTime)
+        assertEquals("10:55", parsed[2].endTime)
+
+        manager.setExamScheduleForTesting(parsed)
+
+        // 1. Student in 3組 chose "日特①"
+        val userElectives1 = mapOf("地歴選" to "日特①")
+        val schedule1P1 = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 25),
+            1,
+            userElectives1
+        )
+        assertEquals("日特①", schedule1P1.subject)
+        assertEquals("3組", schedule1P1.classroom)
+        assertEquals("8:40", schedule1P1.startTime)
+        assertEquals("9:30", schedule1P1.endTime)
+        assertTrue(schedule1P1.isExam)
+        assertTrue(!schedule1P1.isUnselectedElective)
+
+        // Period 2: 英語W with $hr classroom -> HR教室（3組）
+        val schedule1P2 = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 25),
+            2,
+            userElectives1
+        )
+        assertEquals("英語W", schedule1P2.subject)
+        assertEquals("3組", schedule1P2.classroom)
+        assertEquals("9:45", schedule1P2.startTime)
+        assertEquals("10:55", schedule1P2.endTime)
+        assertTrue(schedule1P2.isExam)
+        assertTrue(!schedule1P2.isUnselectedElective)
+
+        // 2. Student in 4組 chose "日特②"
+        val userElectives2 = mapOf("地歴選" to "日特②")
+        val schedule2P1 = manager.resolvePeriodSchedule(
+            classGroup4,
+            java.time.LocalDate.of(2026, 9, 25),
+            1,
+            userElectives2
+        )
+        assertEquals("日特②", schedule2P1.subject)
+        assertEquals("4組", schedule2P1.classroom)
+        assertEquals("8:40", schedule2P1.startTime)
+        assertEquals("9:30", schedule2P1.endTime)
+        assertTrue(schedule2P1.isExam)
+        assertTrue(!schedule2P1.isUnselectedElective)
+
+        // Period 2: 英語W with $hr classroom -> HR教室（4組）
+        val schedule2P2 = manager.resolvePeriodSchedule(
+            classGroup4,
+            java.time.LocalDate.of(2026, 9, 25),
+            2,
+            userElectives2
+        )
+        assertEquals("英語W", schedule2P2.subject)
+        assertEquals("4組", schedule2P2.classroom)
+        assertTrue(schedule2P2.isExam)
+        assertTrue(!schedule2P2.isUnselectedElective)
+
+        // 3. Student in 3組 chose "日特②" (takes exam in 4組)
+        val schedule3P1 = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 25),
+            1,
+            userElectives2
+        )
+        assertEquals("日特②", schedule3P1.subject)
+        assertEquals("4組", schedule3P1.classroom) // Takes in 4組
+        assertTrue(schedule3P1.isExam)
+        assertTrue(!schedule3P1.isUnselectedElective)
+
+        val schedule3P2 = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 25),
+            2,
+            userElectives2
+        )
+        assertEquals("英語W", schedule3P2.subject)
+        assertEquals("3組", schedule3P2.classroom) // Takes in 3組 because $hr is 3組 for classGroup3
+    }
 }

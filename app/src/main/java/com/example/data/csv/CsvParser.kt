@@ -58,10 +58,45 @@ object CsvParser {
      * Parses a single CSV/TSV line into cell values.
      */
     private fun parseCsvLine(line: String): List<String> {
+        val hasComma = line.contains(',')
+        val hasTab = line.contains('\t')
+        if (!hasComma && !hasTab && line.contains(' ')) {
+            // Space delimited line
+            val tokens = mutableListOf<String>()
+            val sb = StringBuilder()
+            var insideQuote = false
+            var i = 0
+            while (i < line.length) {
+                val c = line[i]
+                if (c == '"') {
+                    if (insideQuote && i + 1 < line.length && line[i + 1] == '"') {
+                        sb.append('"')
+                        i++
+                    } else {
+                        insideQuote = !insideQuote
+                    }
+                } else if ((c == ' ' || c == '\u3000') && !insideQuote) {
+                    if (sb.isNotEmpty()) {
+                        tokens.add(sb.toString())
+                        sb.clear()
+                    }
+                } else {
+                    sb.append(c)
+                }
+                i++
+            }
+            if (sb.isNotEmpty()) {
+                tokens.add(sb.toString())
+            }
+            if (tokens.isNotEmpty()) {
+                return tokens
+            }
+        }
+
         val cells = mutableListOf<String>()
         val sb = StringBuilder()
         var insideQuote = false
-        val isTsv = line.contains('\t') && !line.contains(',')
+        val isTsv = hasTab && !hasComma
         val delimiter = if (isTsv) '\t' else ','
 
         var i = 0
@@ -440,7 +475,7 @@ object CsvParser {
                 } else if (!foundRoom && (col.contains("room") || col.contains("教室") || col.contains("場所"))) {
                     roomIdx = c
                     foundRoom = true
-                } else if (!foundClass && (col.contains("class") || col.contains("クラス") || col.contains("組"))) {
+                } else if (!foundClass && !col.contains("room") && !col.contains("教室") && (col.contains("class") || col.contains("クラス") || col.contains("組"))) {
                     classIdx = c
                     foundClass = true
                 }

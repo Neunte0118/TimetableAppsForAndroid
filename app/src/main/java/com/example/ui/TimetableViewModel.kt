@@ -405,6 +405,10 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         val newDark = !_uiState.value.isDarkTheme
         sharedPrefs.edit().putBoolean("dark_theme", newDark).apply()
         _uiState.update { it.copy(isDarkTheme = newDark) }
+        try {
+            com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
+            com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
+        } catch (_: Exception) {}
     }
 
     fun toggleDeveloperMode() {

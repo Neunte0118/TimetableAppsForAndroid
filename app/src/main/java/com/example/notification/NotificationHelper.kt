@@ -217,10 +217,10 @@ object NotificationHelper {
             null
         }
 
-        val summaryText = if (schedule.event.isNotBlank()) {
-            "行事: ${schedule.event}"
-        } else if (activePeriods.isNotEmpty()) {
+        val summaryText = if (activePeriods.isNotEmpty()) {
             activePeriods.joinToString(", ") { it.subject }
+        } else if (schedule.event.isNotBlank()) {
+            "行事: ${schedule.event}"
         } else {
             "予定はありません"
         }

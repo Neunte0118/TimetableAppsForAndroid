@@ -502,7 +502,15 @@ class CsvSyncManager(private val context: Context) {
         if (target2 != null && target2.equals(norm1, ignoreCase = true)) return true
 
         // 3) 両方が source であり同一の target を参照している場合 (例: ⅡLa① と ⅡLa②)
-        if (target1 != null && target2 != null && target1.equals(target2, ignoreCase = true)) return true
+        if (target1 != null && target2 != null && target1.equals(target2, ignoreCase = true)) {
+            // 講座番号等の識別子が異なる場合（例: 日特① と 日特②）は別科目
+            val num1 = s1.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
+            val num2 = s2.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
+            if (num1.isNotEmpty() && num2.isNotEmpty() && num1 != num2) {
+                return false
+            }
+            return true
+        }
 
         // 4) target から source 群への逆引き照合
         val sources1 = targetToSourcesMap[norm1]
@@ -589,6 +597,41 @@ class CsvSyncManager(private val context: Context) {
     }
 
     /**
+     * 考査時間割の教室名を解決。
+     * - "$hr" の場合はHR教室（{クラス}+組、例: "3組"）と表示
+     * - 教室指定があればそのまま表示（空白、"-" 以外）
+     * - 考査CSVで空白等の場合は選択科目CSV等から教室を検索
+     */
+    fun resolveExamClassroom(rawRoom: String, classGroup: ClassGroup, subject: String = ""): String {
+        val trimmed = rawRoom.trim()
+        val classNum = classGroup.id.replace("組", "").trim().ifBlank {
+            classGroup.name.replace("組", "").trim()
+        }
+        val hrClassroom = if (classNum.isNotBlank()) "${classNum}組" else classGroup.name.ifBlank { "HR教室" }
+        val hrKeyword = "\$hr"
+
+        if (trimmed.equals(hrKeyword, ignoreCase = true)) {
+            return hrClassroom
+        }
+        if (trimmed.contains(hrKeyword, ignoreCase = true)) {
+            return trimmed.replace(hrKeyword, hrClassroom, ignoreCase = true)
+        }
+        if (trimmed.isNotBlank() && trimmed != "-") {
+            return trimmed
+        }
+
+        // 考査CSVの教室が空の場合、選択科目CSVから教室を探す
+        val s = subject.trim()
+        val electiveMatch = electives.find { it.elective.trim().equals(s, ignoreCase = true) }
+            ?: electives.find { isSubjectMatch(it.elective, s) }
+        if (electiveMatch != null && electiveMatch.name.isNotBlank()) {
+            return electiveMatch.name.trim()
+        }
+
+        return resolveClassroom(subject, "", classGroup)
+    }
+
+    /**
      * Formats classroom name according to specification:
      * If name is in the form of "n組" (e.g. "1組", "2組", "A組"), appends "教室" -> ("1組教室").
      * Otherwise, displays as-is (e.g. "大講義室", "PC教室", "生物室").
@@ -633,17 +676,24 @@ class CsvSyncManager(private val context: Context) {
             val userElectiveValues = userElectives.values.filter { it.isNotBlank() }
 
             // 1) ユーザーが選択した科目に合致する考査があるかチェック
-            // 番号付き科目（例: "世特①"）と選択科目（例: "世特"）の厳密な照合
-            val userSelectedExam = matchingExams.find { exam ->
+            // 優先度A: 完全一致 (例: exam.subject == "日特①" かつ userChoice == "日特①")
+            var userSelectedExam = matchingExams.find { exam ->
                 userElectiveValues.any { userChoice ->
-                    isSubjectMatch(userChoice, exam.subject)
+                    userChoice.equals(exam.subject.trim(), ignoreCase = true)
+                }
+            }
+
+            // 優先度B: マッピング照合 (例: exam.subject == "日本史特講" かつ userChoice == "日特①")
+            if (userSelectedExam == null) {
+                userSelectedExam = matchingExams.find { exam ->
+                    userElectiveValues.any { userChoice ->
+                        isSubjectMatch(userChoice, exam.subject)
+                    }
                 }
             }
 
             if (userSelectedExam != null) {
-                val classroom = userSelectedExam.classroom.ifBlank {
-                    resolveClassroom(userSelectedExam.subject, "", classGroup)
-                }
+                val classroom = resolveExamClassroom(userSelectedExam.classroom, classGroup, userSelectedExam.subject)
                 return createPeriodSchedule(
                     period = period,
                     subject = userSelectedExam.subject,
@@ -662,9 +712,7 @@ class CsvSyncManager(private val context: Context) {
                 if (originKey != null) {
                     val userChoice = userElectives[originKey]?.trim() ?: ""
                     if (userChoice.isNotBlank()) {
-                        val classroom = exam.classroom.ifBlank {
-                            resolveClassroom(userChoice, originKey, classGroup)
-                        }
+                        val classroom = resolveExamClassroom(exam.classroom, classGroup, userChoice)
                         return createPeriodSchedule(
                             period = period,
                             subject = userChoice,
@@ -680,29 +728,17 @@ class CsvSyncManager(private val context: Context) {
             }
 
             // 3) ユーザーが受講する科目に該当しない場合（未選択、または自分の選択科目でないところ）
-            // 同じ時間に複数の科目がある場合は、{subject}(x{num})というふうに、一つの教科と、被ってる教科の数を括弧で示す
             val distinctSubjects = matchingExams.map { it.subject.trim() }.filter { it.isNotBlank() }.distinct()
             val firstSubject = distinctSubjects.firstOrNull() ?: ""
-            val displaySubject = if (distinctSubjects.size > 1) {
-                "$firstSubject"
-            } else {
-                firstSubject
-            }
             val firstExam = matchingExams.first()
-            val classroom = if (distinctSubjects.size == 1) {
-                firstExam.classroom.ifBlank {
-                    resolveClassroom(firstExam.subject, "", classGroup)
-                }
-            } else {
-                firstExam.classroom
-            }
+            val classroom = resolveExamClassroom(firstExam.classroom, classGroup, firstExam.subject)
 
-            // 必修共通科目かどうかを判定（英語W, 現代文, 英語R, 英語長文, 古典, HR など）
-            val isCommon = distinctSubjects.size == 1 && isCommonExamSubject(distinctSubjects.first())
+            // 必修共通科目かどうかを判定（英語W, 現代文, 英語R, 英語長文, 古典, HR など、または $hr 指定）
+            val isCommon = distinctSubjects.size == 1 && (isCommonExamSubject(distinctSubjects.first()) || firstExam.classroom.contains("\$hr", ignoreCase = true))
 
             return createPeriodSchedule(
                 period = period,
-                subject = displaySubject,
+                subject = firstSubject,
                 classroom = classroom,
                 isChanged = false,
                 isExam = true,
@@ -913,6 +949,13 @@ class CsvSyncManager(private val context: Context) {
     ): String {
         val s = subjectName.trim()
         if (s.isBlank()) return ""
+
+        if (s.equals("\$hr", ignoreCase = true) || originName.trim().equals("\$hr", ignoreCase = true)) {
+            val classNum = classGroup.id.replace("組", "").trim().ifBlank {
+                classGroup.name.replace("組", "").trim()
+            }
+            return if (classNum.isNotBlank()) "${classNum}組" else classGroup.name.ifBlank { "HR教室" }
+        }
 
         val matching = electives.find {
             it.elective.trim().equals(s, ignoreCase = true)
