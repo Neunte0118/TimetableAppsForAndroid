@@ -491,6 +491,19 @@ class CsvSyncManager(private val context: Context) {
         val norm2 = if (s2 == "現世読") "現代世界を読む" else s2
         if (norm1.equals(norm2, ignoreCase = true)) return true
 
+        // Science L match (物L <-> 物理L, 化L <-> 化学L, etc.)
+        val sci1 = ScienceLType.fromSubject(norm1)
+        val sci2 = ScienceLType.fromSubject(norm2)
+        if (sci1 != null && sci2 != null) {
+            if (sci1 != sci2) return false
+            val num1 = norm1.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
+            val num2 = norm2.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
+            if (num1.isNotEmpty() && num2.isNotEmpty() && num1 != num2) {
+                return false
+            }
+            return true
+        }
+
         // 1) s1 が source で s2 が target
         val target1 = sourceToTargetMap[norm1]
             ?: sourceToTargetMap.entries.find { it.key.equals(norm1, ignoreCase = true) }?.value
@@ -675,6 +688,81 @@ class CsvSyncManager(private val context: Context) {
         if (matchingExams.isNotEmpty()) {
             val userElectiveValues = userElectives.values.filter { it.isNotBlank() }
 
+            // 0.1 Check Science L special case:
+            // 考査時間割で、物理L, 化学L, 生物L, 地学Lの4つ（化学L①なども含む）は、複数とっている人がいるので、
+            // 複数とっている場合は、物L/化Lのように表示する。
+            val userScienceTypes = (userElectives.values + userElectives.keys)
+                .filter { it.isNotBlank() }
+                .flatMap { it.split('/') }
+                .mapNotNull { ScienceLType.fromSubject(it) }
+                .distinct()
+                .sortedBy { it.sortOrder }
+
+            val periodExamScienceTypes = matchingExams.flatMap { exam ->
+                exam.subject.split('/').mapNotNull { ScienceLType.fromSubject(it) }
+            }.distinct()
+
+            val isPeriodAllScienceL = matchingExams.any { exam ->
+                val s = exam.subject.trim()
+                s.equals("理科演習L", ignoreCase = true) || s.contains("理科演習L") || s.startsWith("理科演習")
+            }
+
+            if (userScienceTypes.size >= 2 && (isPeriodAllScienceL || periodExamScienceTypes.isNotEmpty())) {
+                val testedScienceTypes = userScienceTypes.filter { type ->
+                    isPeriodAllScienceL ||
+                    periodExamScienceTypes.contains(type) ||
+                    matchingExams.any { exam ->
+                        isSubjectMatch(type.label, exam.subject) ||
+                        isSubjectMatch(type.shortName, exam.subject) ||
+                        exam.subject.contains(type.label) ||
+                        exam.subject.contains(type.shortName)
+                    }
+                }.sortedBy { it.sortOrder }
+
+                if (testedScienceTypes.size >= 2) {
+                    val combinedSubject = testedScienceTypes.joinToString("/") { it.shortName }
+                    val matchedExams = matchingExams.filter { exam ->
+                        val examType = ScienceLType.fromSubject(exam.subject)
+                        if (examType != null) {
+                            testedScienceTypes.contains(examType)
+                        } else {
+                            val splitTypes = exam.subject.split('/').mapNotNull { ScienceLType.fromSubject(it) }
+                            if (splitTypes.isNotEmpty()) {
+                                splitTypes.any { testedScienceTypes.contains(it) }
+                            } else {
+                                val s = exam.subject.trim()
+                                s.equals("理科演習L", ignoreCase = true) || s.contains("理科演習L") ||
+                                testedScienceTypes.any { type ->
+                                    isSubjectMatch(type.label, exam.subject) ||
+                                    isSubjectMatch(type.shortName, exam.subject)
+                                }
+                            }
+                        }
+                    }
+                    val firstExam = matchedExams.firstOrNull() ?: matchingExams.first()
+                    val resolvedRooms = matchedExams.map { exam ->
+                        resolveExamClassroom(exam.classroom, classGroup, exam.subject)
+                    }.filter { it.isNotBlank() && it != "-" }.distinct()
+
+                    val combinedClassroom = if (resolvedRooms.isNotEmpty()) {
+                        resolvedRooms.joinToString("/")
+                    } else {
+                        resolveExamClassroom(firstExam.classroom, classGroup, firstExam.subject)
+                    }
+
+                    return createPeriodSchedule(
+                        period = period,
+                        subject = combinedSubject,
+                        classroom = combinedClassroom,
+                        isChanged = false,
+                        isExam = true,
+                        startTime = firstExam.startTime,
+                        endTime = firstExam.endTime,
+                        isUnselectedElective = false
+                    )
+                }
+            }
+
             // 1) ユーザーが選択した科目に合致する考査があるかチェック
             // 優先度A: 完全一致 (例: exam.subject == "日特①" かつ userChoice == "日特①")
             var userSelectedExam = matchingExams.find { exam ->
@@ -852,7 +940,10 @@ class CsvSyncManager(private val context: Context) {
 
         val isElectiveOrMapped = electives.any { isSubjectMatch(it.elective, s) } ||
                 subjectMappings.any { isSubjectMatch(it.source, s) || isSubjectMatch(it.target, s) } ||
-                s == "現世読"
+                s == "現世読" ||
+                ScienceLType.fromSubject(s) != null ||
+                s.contains("理科演習L") ||
+                s.contains("物L") || s.contains("化L") || s.contains("生L") || s.contains("地L")
         return !isElectiveOrMapped
     }
 

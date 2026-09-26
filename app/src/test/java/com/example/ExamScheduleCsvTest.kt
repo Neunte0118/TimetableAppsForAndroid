@@ -307,4 +307,129 @@ class ExamScheduleCsvTest {
         assertEquals("英語W", schedule3P2.subject)
         assertEquals("3組", schedule3P2.classroom) // Takes in 3組 because $hr is 3組 for classGroup3
     }
+
+    @Test
+    fun testExamSchedule_ScienceL_MultipleTaken_DisplaysCombinedShortNames() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = CsvSyncManager(context)
+        val classGroup3 = com.example.model.ClassGroup(id = "3", name = "3組", grade = 3, section = "3")
+
+        // 考査時間割: 物理L, 化学L, 生物L, 地学L
+        val examCsv = """
+            dates periods subjects start_time end_time classroom
+            9月26日 2 物理L 9:45 10:55 物理室
+            9月26日 2 化学L 9:45 10:55 化学室
+            9月26日 2 生物L 9:45 10:55 生物室
+            9月26日 2 地学L 9:45 10:55 地学室
+        """.trimIndent()
+        manager.setExamScheduleForTesting(CsvParser.parseExamSchedule(examCsv))
+
+        // 1. 物理Lと化学L①の2科目を複数とっている生徒 -> "物L/化L"
+        val userElectivesBoth = mapOf(
+            "理選1" to "物理L",
+            "理選2" to "化学L①"
+        )
+        val scheduleBoth = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 26),
+            2,
+            userElectivesBoth
+        )
+        assertEquals("物L/化L", scheduleBoth.subject)
+        assertEquals("物理室/化学室", scheduleBoth.classroom)
+        assertTrue(scheduleBoth.isExam)
+        assertTrue(!scheduleBoth.isUnselectedElective)
+
+        // 2. 物理Lと生物L①を複数とっている生徒 -> "物L/生L"
+        val userElectivesPhysBio = mapOf(
+            "理選1" to "物理L",
+            "理選2" to "生物L①"
+        )
+        val schedulePhysBio = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 26),
+            2,
+            userElectivesPhysBio
+        )
+        assertEquals("物L/生L", schedulePhysBio.subject)
+        assertEquals("物理室/生物室", schedulePhysBio.classroom)
+        assertTrue(schedulePhysBio.isExam)
+        assertTrue(!schedulePhysBio.isUnselectedElective)
+
+        // 3. 化学L②と地学L①を複数とっている生徒 -> "化L/地L"
+        val userElectivesChemGeo = mapOf(
+            "理選1" to "化学L②",
+            "理選2" to "地学L①"
+        )
+        val scheduleChemGeo = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 26),
+            2,
+            userElectivesChemGeo
+        )
+        assertEquals("化L/地L", scheduleChemGeo.subject)
+        assertEquals("化学室/地学室", scheduleChemGeo.classroom)
+        assertTrue(scheduleChemGeo.isExam)
+
+        // 4. 1科目だけとっている生徒 (物理Lのみ) -> "物理L" (単体表示)
+        val userElectivesOnlyPhys = mapOf("理選" to "物理L")
+        val scheduleOnlyPhys = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 26),
+            2,
+            userElectivesOnlyPhys
+        )
+        assertEquals("物理L", scheduleOnlyPhys.subject)
+        assertEquals("物理室", scheduleOnlyPhys.classroom)
+        assertTrue(scheduleOnlyPhys.isExam)
+        assertTrue(!scheduleOnlyPhys.isUnselectedElective)
+
+        // 5. 1科目だけとっている生徒 (化学L①のみ) -> "化学L" (単体表示)
+        val userElectivesOnlyChem = mapOf("理選" to "化学L①")
+        val scheduleOnlyChem = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 26),
+            2,
+            userElectivesOnlyChem
+        )
+        assertEquals("化学L", scheduleOnlyChem.subject)
+        assertEquals("化学室", scheduleOnlyChem.classroom)
+        assertTrue(scheduleOnlyChem.isExam)
+        assertTrue(!scheduleOnlyChem.isUnselectedElective)
+    }
+
+    @Test
+    fun testExamSchedule_ScienceL_MultipleTaken_WithCollectiveExamName() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = CsvSyncManager(context)
+        val classGroup3 = com.example.model.ClassGroup(id = "3", name = "3組", grade = 3, section = "3")
+
+        // 考査CSVで「理科演習L」として記載されている場合
+        val examCsv = """
+            dates periods subjects start_time end_time classroom
+            9月26日 2 理科演習L 9:45 10:55 ${'$'}hr
+        """.trimIndent()
+        manager.setExamScheduleForTesting(CsvParser.parseExamSchedule(examCsv))
+
+        val userElectivesBoth = mapOf(
+            "理選1" to "物理L",
+            "理選2" to "化学L①"
+        )
+        val scheduleBoth = manager.resolvePeriodSchedule(
+            classGroup3,
+            java.time.LocalDate.of(2026, 9, 26),
+            2,
+            userElectivesBoth
+        )
+        assertEquals("物L/化L", scheduleBoth.subject)
+        assertEquals("3組", scheduleBoth.classroom)
+        assertTrue(scheduleBoth.isExam)
+        assertTrue(!scheduleBoth.isUnselectedElective)
+    }
+
+    @Test
+    fun testAppVersion_is131() {
+        assertEquals("1.3.1", com.example.BuildConfig.VERSION_NAME)
+        assertEquals(4, com.example.BuildConfig.VERSION_CODE)
+    }
 }

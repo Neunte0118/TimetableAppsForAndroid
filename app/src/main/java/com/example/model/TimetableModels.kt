@@ -176,11 +176,12 @@ object SubjectColorDefaults {
             saturation = 0.35f,
             value = 0.78f,
             subjects = listOf(
-                "化学", "物理", "生物", "地学", "理演L",
-                "化S①", "化S②", "化S③", "化S④", "化S⑤", "化S⑥", "化学L①", "化学L②",
+                "化学", "物理", "生物", "地学", "理演L", "理科演習L",
+                "物L", "化L", "生L", "地L",
+                "化S①", "化S②", "化S③", "化S④", "化S⑤", "化S⑥", "化学L", "化学L①", "化学L②",
                 "物S①", "物S②", "物S③", "物S④", "物S⑤", "物理L",
-                "生S①", "生S②", "生物L①", "生物L②", "生物L③",
-                "地学L①", "地学L②", "地学L③"
+                "生S①", "生S②", "生物L", "生物L①", "生物L②", "生物L③",
+                "地学L", "地学L①", "地学L②", "地学L③"
             )
         ),
         SubjectColorGroup(
@@ -249,7 +250,24 @@ object SubjectColorDefaults {
     fun getColorForSubject(subject: String, groups: List<SubjectColorGroup>): Long {
         val trimmed = subject.trim()
         val found = groups.find { grp -> grp.subjects.any { it.equals(trimmed, ignoreCase = true) } }
-        return found?.toColorLong() ?: defaultSubjectColors[trimmed] ?: 0xFF594e52L
+        if (found != null) return found.toColorLong()
+        if (defaultSubjectColors.containsKey(trimmed)) return defaultSubjectColors[trimmed]!!
+
+        if (trimmed.contains('/')) {
+            val parts = trimmed.split('/')
+            for (part in parts) {
+                val p = part.trim()
+                val partFound = groups.find { grp ->
+                    grp.subjects.any {
+                        it.equals(p, ignoreCase = true) ||
+                        it.startsWith(p, ignoreCase = true) ||
+                        p.startsWith(it, ignoreCase = true)
+                    }
+                }
+                if (partFound != null) return partFound.toColorLong()
+            }
+        }
+        return 0xFF594e52L
     }
 }
 

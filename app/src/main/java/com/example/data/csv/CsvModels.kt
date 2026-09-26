@@ -154,6 +154,33 @@ data class SubjectMappingRow(
 )
 
 /**
+ * 理科演習L 4科目の識別定義 (物理L, 化学L, 生物L, 地学L)
+ */
+enum class ScienceLType(val label: String, val shortName: String, val sortOrder: Int) {
+    PHYSICS("物理L", "物L", 1),
+    CHEMISTRY("化学L", "化L", 2),
+    BIOLOGY("生物L", "生L", 3),
+    GEOLOGY("地学L", "地L", 4);
+
+    companion object {
+        fun fromSubject(subject: String): ScienceLType? {
+            val s = subject.trim()
+            if (s.isBlank()) return null
+            val hasL = s.contains("L", ignoreCase = true) || s.contains("ｌ")
+            if (!hasL) return null
+
+            return when {
+                s.contains("生物") || s == "生L" || s.startsWith("生L") || s == "生ｌ" || s.startsWith("生ｌ") -> BIOLOGY
+                s.contains("物理") || s == "物L" || s.startsWith("物L") || s == "物ｌ" || s.startsWith("物ｌ") -> PHYSICS
+                s.contains("化学") || s == "化L" || s.startsWith("化L") || s == "化ｌ" || s.startsWith("化ｌ") -> CHEMISTRY
+                s.contains("地学") || s == "地L" || s.startsWith("地L") || s == "地ｌ" || s.startsWith("地ｌ") -> GEOLOGY
+                else -> null
+            }
+        }
+    }
+}
+
+/**
  * 外部CSV URL設定及び連携リンク設定
  */
 data class CsvUrlsConfig(
