@@ -297,8 +297,9 @@ object NotificationHelper {
             return false
         }
 
+        val timeLabel = if (periodSchedule?.startTime?.isNotBlank() == true) " (${periodSchedule.startTime}〜)" else ""
         val title = "次は ${subject} です。"
-        val detailText = "${period} 限の科目は ${subject} です。"
+        val detailText = "${period} 限の科目は ${subject} です。$timeLabel"
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -361,37 +362,57 @@ object NotificationHelper {
         // 1. 当日の各限のアラーム（休日以外）
         if (!isHoliday(today, repo)) {
             val schedule = repo.getDaySchedule(repo.selectedClass.value, today, today)
-            for (pt in PERIOD_TIMES) {
-                val periodStartTime = java.time.LocalDateTime.of(today, java.time.LocalTime.of(pt.startHour, pt.startMinute))
-                val notifyTime = periodStartTime.minusMinutes(leadMinutes.toLong())
+            val maxPeriod = maxOf(5, schedule.periods.maxOfOrNull { it.period } ?: 5)
+            for (p in 1..maxPeriod) {
+                val periodSchedule = schedule.periods.find { it.period == p }
+                val subject = periodSchedule?.subject?.trim() ?: ""
+                if (subject.isNotBlank() && subject != "なし" && subject != "-") {
+                    val customStartTime = periodSchedule?.startTime?.trim() ?: ""
+                    val periodStartTime: java.time.LocalDateTime? = if (customStartTime.isNotBlank()) {
+                        val parts = customStartTime.split(":")
+                        if (parts.size >= 2) {
+                            val h = parts[0].trim().toIntOrNull()
+                            val m = parts[1].trim().toIntOrNull()
+                            if (h != null && m != null) {
+                                java.time.LocalDateTime.of(today, java.time.LocalTime.of(h, m))
+                            } else null
+                        } else null
+                    } else {
+                        val pt = PERIOD_TIMES.find { it.period == p }
+                        if (pt != null) {
+                            java.time.LocalDateTime.of(today, java.time.LocalTime.of(pt.startHour, pt.startMinute))
+                        } else null
+                    }
 
-                if (notifyTime.isAfter(now)) {
-                    val subject = schedule.periods.find { it.period == pt.period }?.subject?.trim() ?: ""
-                    if (subject.isNotBlank() && subject != "なし" && subject != "-") {
-                        val cal = Calendar.getInstance().apply {
-                            set(Calendar.YEAR, notifyTime.year)
-                            set(Calendar.MONTH, notifyTime.monthValue - 1)
-                            set(Calendar.DAY_OF_MONTH, notifyTime.dayOfMonth)
-                            set(Calendar.HOUR_OF_DAY, notifyTime.hour)
-                            set(Calendar.MINUTE, notifyTime.minute)
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
+                    if (periodStartTime != null) {
+                        val notifyTime = periodStartTime.minusMinutes(leadMinutes.toLong())
+
+                        if (notifyTime.isAfter(now)) {
+                            val cal = Calendar.getInstance().apply {
+                                set(Calendar.YEAR, notifyTime.year)
+                                set(Calendar.MONTH, notifyTime.monthValue - 1)
+                                set(Calendar.DAY_OF_MONTH, notifyTime.dayOfMonth)
+                                set(Calendar.HOUR_OF_DAY, notifyTime.hour)
+                                set(Calendar.MINUTE, notifyTime.minute)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+
+                            val intent = Intent(context, NextClassNotificationReceiver::class.java).apply {
+                                action = ACTION_NEXT_CLASS_NOTIFICATION
+                                putExtra(EXTRA_PERIOD, p)
+                                putExtra(EXTRA_DATE_EPOCH_DAY, today.toEpochDay())
+                            }
+                            val requestCode = 3000 + p
+                            val pendingIntent = PendingIntent.getBroadcast(
+                                context,
+                                requestCode,
+                                intent,
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+
+                            setExactAlarm(alarmManager, cal.timeInMillis, pendingIntent)
                         }
-
-                        val intent = Intent(context, NextClassNotificationReceiver::class.java).apply {
-                            action = ACTION_NEXT_CLASS_NOTIFICATION
-                            putExtra(EXTRA_PERIOD, pt.period)
-                            putExtra(EXTRA_DATE_EPOCH_DAY, today.toEpochDay())
-                        }
-                        val requestCode = 3000 + pt.period
-                        val pendingIntent = PendingIntent.getBroadcast(
-                            context,
-                            requestCode,
-                            intent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                        )
-
-                        setExactAlarm(alarmManager, cal.timeInMillis, pendingIntent)
                     }
                 }
             }

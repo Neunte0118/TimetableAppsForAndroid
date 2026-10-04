@@ -64,6 +64,10 @@ class CsvSyncManager(private val context: Context) {
         private set
     var subjectMappings: List<SubjectMappingRow> = emptyList()
         private set
+    var specialSchedules: List<SpecialScheduleRow> = emptyList()
+        private set
+    var secondTermClassSchedule: List<BasicClassScheduleRow> = emptyList()
+        private set
     private var sourceToTargetMap: Map<String, String> = emptyMap()
     private var targetToSourcesMap: Map<String, Set<String>> = emptyMap()
 
@@ -123,6 +127,20 @@ class CsvSyncManager(private val context: Context) {
             savedSubjectMapping
         }
 
+        val savedSpecial = prefs.getString("url_special_schedule", null)
+        val effectiveSpecial = if (savedSpecial.isNullOrBlank()) {
+            defaultConfig.specialScheduleUrl
+        } else {
+            savedSpecial
+        }
+
+        val savedSecondTerm = prefs.getString("url_second_term_class", null)
+        val effectiveSecondTerm = if (savedSecondTerm.isNullOrBlank()) {
+            defaultConfig.secondTermClassUrl
+        } else {
+            savedSecondTerm
+        }
+
         return CsvUrlsConfig(
             commonScheduleUrl = savedCommon ?: defaultConfig.commonScheduleUrl,
             basicClassUrl = savedBasic ?: defaultConfig.basicClassUrl,
@@ -134,6 +152,8 @@ class CsvSyncManager(private val context: Context) {
             courseChangeSheetUrl = savedCourseChangeSheet ?: defaultConfig.courseChangeSheetUrl,
             examScheduleUrl = effectiveExamSchedule,
             subjectMappingUrl = effectiveSubjectMapping,
+            specialScheduleUrl = effectiveSpecial,
+            secondTermClassUrl = effectiveSecondTerm,
             reportUrl = prefs.getString("url_report", defaultConfig.reportUrl) ?: defaultConfig.reportUrl,
             timetableChangeUrl = prefs.getString("url_timetable_change", defaultConfig.timetableChangeUrl) ?: defaultConfig.timetableChangeUrl
         )
@@ -152,6 +172,8 @@ class CsvSyncManager(private val context: Context) {
             .putString("url_course_change_sheet", config.courseChangeSheetUrl.trim())
             .putString("url_exam_schedule", config.examScheduleUrl.trim())
             .putString("url_subject_mapping", config.subjectMappingUrl.trim())
+            .putString("url_special_schedule", config.specialScheduleUrl.trim())
+            .putString("url_second_term_class", config.secondTermClassUrl.trim())
             .putString("url_report", config.reportUrl.trim())
             .putString("url_timetable_change", config.timetableChangeUrl.trim())
 
@@ -183,8 +205,11 @@ class CsvSyncManager(private val context: Context) {
         val courseChangesCsv = prefs.getString("csv_cache_course_changes", null) ?: DefaultCsvData.COURSE_CHANGE_CSV
         val examScheduleCsv = prefs.getString("csv_cache_exam_schedule", null) ?: DefaultCsvData.EXAM_SCHEDULE_CSV
         val subjectMappingCsv = prefs.getString("csv_cache_subject_mappings", null) ?: DefaultCsvData.SUBJECT_MAPPING_CSV
+        val specialScheduleCsv = prefs.getString("csv_cache_special_schedule", null) ?: DefaultCsvData.SPECIAL_SCHEDULE_CSV
+        val secondTermCsv = prefs.getString("csv_cache_second_term_class", null) ?: DefaultCsvData.SECOND_TERM_CLASS_CSV
 
         basicClassSchedule = CsvParser.parseBasicClassSchedule(basicCsv)
+        secondTermClassSchedule = if (secondTermCsv.isNotBlank()) CsvParser.parseBasicClassSchedule(secondTermCsv) else emptyList()
         commonSchedules = CsvParser.parseCommonSchedule(commonCsv)
         electives = CsvParser.parseElectives(electivesCsv)
         events = CsvParser.parseEvents(eventsCsv)
@@ -195,9 +220,11 @@ class CsvSyncManager(private val context: Context) {
         courseChanges = CsvParser.parseCourseChanges(courseChangesCsv)
         examSchedules = CsvParser.parseExamSchedule(examScheduleCsv)
         updateSubjectMappings(CsvParser.parseSubjectMapping(subjectMappingCsv))
+        specialSchedules = if (specialScheduleCsv.isNotBlank()) CsvParser.parseSpecialSchedule(specialScheduleCsv) else emptyList()
 
         _syncStatus.value = _syncStatus.value.copy(
             basicCount = basicClassSchedule.size,
+            secondTermCount = secondTermClassSchedule.size,
             commonCount = commonSchedules.size,
             electiveCount = electives.size,
             eventCount = events.size,
@@ -206,7 +233,8 @@ class CsvSyncManager(private val context: Context) {
             timetableChangeCount = timetableChanges.size,
             courseChangeCount = courseChanges.size,
             examCount = examSchedules.size,
-            subjectMappingCount = subjectMappings.size
+            subjectMappingCount = subjectMappings.size,
+            specialScheduleCount = specialSchedules.size
         )
     }
 
@@ -245,6 +273,7 @@ class CsvSyncManager(private val context: Context) {
             .remove("csv_cache_course_changes")
             .remove("csv_cache_exam_schedule")
             .remove("csv_cache_subject_mappings")
+            .remove("csv_cache_special_schedule")
             .remove("last_sync_time")
             .remove("last_sync_message")
             .apply()
@@ -300,6 +329,14 @@ class CsvSyncManager(private val context: Context) {
 
             val subjectMappingDeferred = if (config.subjectMappingUrl.isNotBlank()) {
                 async { fetchUrlContent(config.subjectMappingUrl) }
+            } else null
+
+            val specialScheduleDeferred = if (config.specialScheduleUrl.isNotBlank()) {
+                async { fetchUrlContent(config.specialScheduleUrl) }
+            } else null
+
+            val secondTermDeferred = if (config.secondTermClassUrl.isNotBlank()) {
+                async { fetchUrlContent(config.secondTermClassUrl) }
             } else null
 
             // 結果を並列待機して反映
@@ -364,6 +401,18 @@ class CsvSyncManager(private val context: Context) {
                 updateSubjectMappings(parsed)
                 updatedCount++
             }?.onFailure { errors.add("科目対応表: ${it.localizedMessage}") }
+
+            specialScheduleDeferred?.await()?.onSuccess { text ->
+                prefs.edit().putString("csv_cache_special_schedule", text).apply()
+                specialSchedules = CsvParser.parseSpecialSchedule(text)
+                updatedCount++
+            }?.onFailure { errors.add("特別時程時間割: ${it.localizedMessage}") }
+
+            secondTermDeferred?.await()?.onSuccess { text ->
+                prefs.edit().putString("csv_cache_second_term_class", text).apply()
+                secondTermClassSchedule = CsvParser.parseBasicClassSchedule(text)
+                updatedCount++
+            }?.onFailure { errors.add("後期クラス別時間割: ${it.localizedMessage}") }
         }
 
         if (updatedCount == 0 && errors.isEmpty()) {
@@ -393,6 +442,7 @@ class CsvSyncManager(private val context: Context) {
             lastSyncSuccess = isSuccess,
             lastSyncMessage = message,
             basicCount = basicClassSchedule.size,
+            secondTermCount = secondTermClassSchedule.size,
             commonCount = commonSchedules.size,
             electiveCount = electives.size,
             eventCount = events.size,
@@ -401,7 +451,8 @@ class CsvSyncManager(private val context: Context) {
             timetableChangeCount = timetableChanges.size,
             courseChangeCount = courseChanges.size,
             examCount = examSchedules.size,
-            subjectMappingCount = subjectMappings.size
+            subjectMappingCount = subjectMappings.size,
+            specialScheduleCount = specialSchedules.size
         )
 
         if (isSuccess) Result.success(message) else Result.failure(Exception(message))
@@ -468,7 +519,7 @@ class CsvSyncManager(private val context: Context) {
      * マッピングに存在しない場合はそのままトリムした文字列を返す。
      */
     fun getTargetSubject(source: String): String {
-        val s = source.trim()
+        val s = CsvNormalizer.normalizeSubject(source)
         if (s.isEmpty()) return ""
         return sourceToTargetMap[s]
             ?: sourceToTargetMap.entries.find { it.key.equals(s, ignoreCase = true) }?.value
@@ -477,27 +528,23 @@ class CsvSyncManager(private val context: Context) {
 
     /**
      * 2つの科目名が合致するかどうかを判定。
-     * ユーザー指示「科目名の正規化はいりません」に基づき、正規化処理（末尾番号除去等）は行わず、
+     * CsvNormalizerによる英数字・記号・同義語の共通パイプライン正規化を行い、
      * 完全一致および科目名対応表（マッピング: source <-> target）を用いて照合します。
+     * （※講座番号等の識別子は別科目として区別します）
      */
     fun isSubjectMatch(name1: String, name2: String): Boolean {
-        val s1 = name1.trim()
-        val s2 = name2.trim()
+        val s1 = CsvNormalizer.normalizeSubject(name1)
+        val s2 = CsvNormalizer.normalizeSubject(name2)
         if (s1.isEmpty() || s2.isEmpty()) return false
         if (s1.equals(s2, ignoreCase = true)) return true
 
-        // 「現世読」と「現代世界を読む」/「現読」の同義語対応
-        val norm1 = if (s1 == "現世読") "現代世界を読む" else s1
-        val norm2 = if (s2 == "現世読") "現代世界を読む" else s2
-        if (norm1.equals(norm2, ignoreCase = true)) return true
-
         // Science L match (物L <-> 物理L, 化L <-> 化学L, etc.)
-        val sci1 = ScienceLType.fromSubject(norm1)
-        val sci2 = ScienceLType.fromSubject(norm2)
+        val sci1 = ScienceLType.fromSubject(s1)
+        val sci2 = ScienceLType.fromSubject(s2)
         if (sci1 != null && sci2 != null) {
             if (sci1 != sci2) return false
-            val num1 = norm1.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
-            val num2 = norm2.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
+            val num1 = s1.filter { it in '\u2460'..'\u2473' || it in '0'..'9' }
+            val num2 = s2.filter { it in '\u2460'..'\u2473' || it in '0'..'9' }
             if (num1.isNotEmpty() && num2.isNotEmpty() && num1 != num2) {
                 return false
             }
@@ -505,20 +552,20 @@ class CsvSyncManager(private val context: Context) {
         }
 
         // 1) s1 が source で s2 が target
-        val target1 = sourceToTargetMap[norm1]
-            ?: sourceToTargetMap.entries.find { it.key.equals(norm1, ignoreCase = true) }?.value
-        if (target1 != null && target1.equals(norm2, ignoreCase = true)) return true
+        val target1 = sourceToTargetMap[s1]
+            ?: sourceToTargetMap.entries.find { it.key.equals(s1, ignoreCase = true) }?.value
+        if (target1 != null && target1.equals(s2, ignoreCase = true)) return true
 
         // 2) s2 が source で s1 が target
-        val target2 = sourceToTargetMap[norm2]
-            ?: sourceToTargetMap.entries.find { it.key.equals(norm2, ignoreCase = true) }?.value
-        if (target2 != null && target2.equals(norm1, ignoreCase = true)) return true
+        val target2 = sourceToTargetMap[s2]
+            ?: sourceToTargetMap.entries.find { it.key.equals(s2, ignoreCase = true) }?.value
+        if (target2 != null && target2.equals(s1, ignoreCase = true)) return true
 
         // 3) 両方が source であり同一の target を参照している場合 (例: ⅡLa① と ⅡLa②)
         if (target1 != null && target2 != null && target1.equals(target2, ignoreCase = true)) {
             // 講座番号等の識別子が異なる場合（例: 日特① と 日特②）は別科目
-            val num1 = s1.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
-            val num2 = s2.filter { it in '\u2460'..'\u2473' || it in '0'..'9' || it in '０'..'９' }
+            val num1 = s1.filter { it in '\u2460'..'\u2473' || it in '0'..'9' }
+            val num2 = s2.filter { it in '\u2460'..'\u2473' || it in '0'..'9' }
             if (num1.isNotEmpty() && num2.isNotEmpty() && num1 != num2) {
                 return false
             }
@@ -526,13 +573,13 @@ class CsvSyncManager(private val context: Context) {
         }
 
         // 4) target から source 群への逆引き照合
-        val sources1 = targetToSourcesMap[norm1]
-            ?: targetToSourcesMap.entries.find { it.key.equals(norm1, ignoreCase = true) }?.value
-        if (sources1 != null && sources1.any { it.equals(norm2, ignoreCase = true) }) return true
+        val sources1 = targetToSourcesMap[s1]
+            ?: targetToSourcesMap.entries.find { it.key.equals(s1, ignoreCase = true) }?.value
+        if (sources1 != null && sources1.any { it.equals(s2, ignoreCase = true) }) return true
 
-        val sources2 = targetToSourcesMap[norm2]
-            ?: targetToSourcesMap.entries.find { it.key.equals(norm2, ignoreCase = true) }?.value
-        if (sources2 != null && sources2.any { it.equals(norm1, ignoreCase = true) }) return true
+        val sources2 = targetToSourcesMap[s2]
+            ?: targetToSourcesMap.entries.find { it.key.equals(s2, ignoreCase = true) }?.value
+        if (sources2 != null && sources2.any { it.equals(s1, ignoreCase = true) }) return true
 
         return false
     }
@@ -564,8 +611,8 @@ class CsvSyncManager(private val context: Context) {
         val resultMap = LinkedHashMap<String, MutableList<String>>()
         val rawId = classId.replace("組", "").trim()
 
-        // 1. Discover origin subjects used in basicClassSchedule for this class
-        val classBasicRows = basicClassSchedule.filter {
+        // 1. Discover origin subjects used in basicClassSchedule for this class (both terms)
+        val classBasicRows = (basicClassSchedule + secondTermClassSchedule).filter {
             val rowClass = it.classId.trim().replace("組", "")
             rowClass == rawId || rowClass == classId
         }
@@ -836,30 +883,43 @@ class CsvSyncManager(private val context: Context) {
             )
         }
 
-        // 1. Initial resolution from Common Schedule or Default Pattern
-        val commonRow = commonSchedules.find { it.month == month && it.day == day }
-        val periodIndex = period - 1
-        val rawCode = commonRow?.periodCodes?.getOrNull(periodIndex)?.trim() ?: ""
+        // 0.8 Check 特別時程時間割 (Special Schedule: date, period, subject, start_time, end_time)
+        val specialRow = specialSchedules.find { it.month == month && it.day == day && it.period == period }
+        var specialStartTime = ""
+        var specialEndTime = ""
 
+        // 1. Initial resolution from Special Schedule, Common Schedule or Default Pattern
         var currentSubject: String
         var currentOrigin: String
 
-        if (rawCode.isNotBlank()) {
-            val (decodedSub, decodedOrig) = decodeSubjectCode(rawCode, classGroup.id, period)
+        if (specialRow != null) {
+            val (decodedSub, decodedOrig) = decodeSubjectCode(specialRow.subject, classGroup.id, period, date)
             currentSubject = decodedSub
             currentOrigin = decodedOrig
-        } else if (commonRow != null) {
-            currentSubject = ""
-            currentOrigin = ""
+            specialStartTime = specialRow.startTime
+            specialEndTime = specialRow.endTime
         } else {
-            val dowJp = getDayOfWeekJp(date.dayOfWeek)
-            if (date.dayOfWeek == DayOfWeek.SUNDAY || isHoliday(date)) {
+            val commonRow = commonSchedules.find { it.month == month && it.day == day }
+            val periodIndex = period - 1
+            val rawCode = commonRow?.periodCodes?.getOrNull(periodIndex)?.trim() ?: ""
+
+            if (rawCode.isNotBlank()) {
+                val (decodedSub, decodedOrig) = decodeSubjectCode(rawCode, classGroup.id, period, date)
+                currentSubject = decodedSub
+                currentOrigin = decodedOrig
+            } else if (commonRow != null) {
                 currentSubject = ""
                 currentOrigin = ""
             } else {
-                val base = findSubjectInBasicSchedule(classGroup.id, "A", dowJp, period)
-                currentSubject = base
-                currentOrigin = base
+                val dowJp = getDayOfWeekJp(date.dayOfWeek)
+                if (date.dayOfWeek == DayOfWeek.SUNDAY || isHoliday(date)) {
+                    currentSubject = ""
+                    currentOrigin = ""
+                } else {
+                    val base = findSubjectInBasicSchedule(classGroup.id, "A", dowJp, period, date)
+                    currentSubject = base
+                    currentOrigin = base
+                }
             }
         }
 
@@ -880,7 +940,7 @@ class CsvSyncManager(private val context: Context) {
         }
 
         if (matchingCourseChange != null) {
-            val (newSub, newOrig) = decodeSubjectCode(matchingCourseChange.newCourse.trim(), classGroup.id, period)
+            val (newSub, newOrig) = decodeSubjectCode(matchingCourseChange.newCourse.trim(), classGroup.id, period, date)
             resolvedSubject = resolveWithElectives(newSub, newOrig, userElectives)
             currentOrigin = if (newOrig.isNotBlank()) newOrig else newSub
             isChangedByNotification = true
@@ -899,7 +959,7 @@ class CsvSyncManager(private val context: Context) {
             val specificChange = matchingTimetableChanges.find { it.classId.trim() != "0" && it.classId.trim() != "全" }
                 ?: matchingTimetableChanges.last()
             val rawChangeSubject = specificChange.subject.trim()
-            val (decodedSub, decodedOrig) = decodeSubjectCode(rawChangeSubject, classGroup.id, period)
+            val (decodedSub, decodedOrig) = decodeSubjectCode(rawChangeSubject, classGroup.id, period, date)
             resolvedSubject = resolveWithElectives(decodedSub, decodedOrig, userElectives)
             currentOrigin = if (decodedOrig.isNotBlank()) decodedOrig else decodedSub
             isChangedByNotification = true
@@ -921,6 +981,8 @@ class CsvSyncManager(private val context: Context) {
             classroom = classroom,
             isChanged = isChangedByNotification,
             isExam = false,
+            startTime = specialStartTime,
+            endTime = specialEndTime,
             isUnselectedElective = isUnselectedElective
         )
     }
@@ -947,18 +1009,23 @@ class CsvSyncManager(private val context: Context) {
         return !isElectiveOrMapped
     }
 
-    private fun decodeSubjectCode(code: String, classId: String, currentPeriod: Int): Pair<String, String> {
+    private fun decodeSubjectCode(
+        code: String,
+        classId: String,
+        currentPeriod: Int,
+        date: LocalDate? = null
+    ): Pair<String, String> {
         val trimmed = code.trim()
         if (trimmed.isBlank()) return Pair("", "")
 
-        // Check if code matches pattern e.g. "A月1", "B火3", "C土2"
-        val patternRegex = Regex("""([A-Za-z])(月|火|水|木|金|土|日)(\d)""")
+        // Check if code matches pattern e.g. "A月1", "B火3", "C土2", "A金6"
+        val patternRegex = Regex("""([A-Za-z])(月|火|水|木|金|土|日)(\d+)""")
         val match = patternRegex.find(trimmed)
         if (match != null) {
             val type = match.groupValues[1].uppercase()
             val dow = match.groupValues[2]
             val targetPeriod = match.groupValues[3].toIntOrNull() ?: currentPeriod
-            val found = findSubjectInBasicSchedule(classId, type, dow, targetPeriod)
+            val found = findSubjectInBasicSchedule(classId, type, dow, targetPeriod, date)
             return Pair(found, found)
         }
         return Pair(trimmed, trimmed)
@@ -1081,8 +1148,8 @@ class CsvSyncManager(private val context: Context) {
      */
     fun getAllKnownSubjects(): List<String> {
         val set = linkedSetOf<String>()
-        // 1. 基本時間割に登場する科目
-        basicClassSchedule.forEach { row ->
+        // 1. 基本時間割（前期・後期）に登場する科目
+        (basicClassSchedule + secondTermClassSchedule).forEach { row ->
             row.periods.forEach { p ->
                 val clean = p.trim()
                 if (clean.isNotBlank() && !clean.matches(Regex("""[A-Za-z][月火水木金土日]\d"""))) {
@@ -1108,17 +1175,49 @@ class CsvSyncManager(private val context: Context) {
         return set.toList()
     }
 
-    private fun findSubjectInBasicSchedule(classId: String, type: String, dayOfWeekJp: String, period: Int): String {
+    /**
+     * 10月6日以降（後期）かどうかを判定。
+     * 日本の学制における後期（10月6日〜12月31日、および翌年1月1日〜3月31日）を対象とします。
+     */
+    fun isSecondTerm(date: LocalDate): Boolean {
+        val m = date.monthValue
+        val d = date.dayOfMonth
+        return (m == 10 && d >= 6) || m in 11..12 || m in 1..3
+    }
+
+    private fun findSubjectInBasicSchedule(
+        classId: String,
+        type: String,
+        dayOfWeekJp: String,
+        period: Int,
+        date: LocalDate? = null
+    ): String {
         val rawId = classId.replace("組", "").trim()
-        val row = basicClassSchedule.find {
+        val scheduleList = if (date != null && isSecondTerm(date) && secondTermClassSchedule.isNotEmpty()) {
+            secondTermClassSchedule
+        } else {
+            basicClassSchedule
+        }
+        val row = scheduleList.find {
             val rId = it.classId.trim().replace("組", "")
             (rId == rawId || rId == classId) && it.type.equals(type, ignoreCase = true) && it.dayOfWeek == dayOfWeekJp
-        } ?: basicClassSchedule.find {
+        } ?: scheduleList.find {
             it.classId == "1" && it.type.equals(type, ignoreCase = true) && it.dayOfWeek == dayOfWeekJp
         }
 
-        val periodIdx = (period - 1).coerceIn(0, 4)
-        return row?.periods?.getOrNull(periodIdx)?.trim() ?: ""
+        val periodIdx = period - 1
+        return if (periodIdx >= 0) row?.periods?.getOrNull(periodIdx)?.trim() ?: "" else ""
+    }
+
+    /**
+     * 指定された日の最大時限数を取得（通常は5限、特別時程や考査で6限や7限があればその最大値）
+     */
+    fun getMaxPeriodsForDate(date: LocalDate): Int {
+        val m = date.monthValue
+        val d = date.dayOfMonth
+        val maxSpecial = specialSchedules.filter { it.month == m && it.day == d }.maxOfOrNull { it.period } ?: 5
+        val maxExam = examSchedules.filter { it.month == m && it.day == d }.maxOfOrNull { it.period } ?: 5
+        return maxOf(5, maxSpecial, maxExam)
     }
 
     private fun getDayOfWeekJp(dow: DayOfWeek): String {
@@ -1203,6 +1302,11 @@ class CsvSyncManager(private val context: Context) {
     }
 
     @androidx.annotation.VisibleForTesting
+    fun setBasicClassScheduleForTesting(list: List<BasicClassScheduleRow>) {
+        this.basicClassSchedule = list
+    }
+
+    @androidx.annotation.VisibleForTesting
     fun setElectivesForTesting(list: List<ElectiveItemRow>) {
         this.electives = list
     }
@@ -1210,5 +1314,15 @@ class CsvSyncManager(private val context: Context) {
     @androidx.annotation.VisibleForTesting
     fun setExamScheduleForTesting(list: List<ExamScheduleRow>) {
         this.examSchedules = list
+    }
+
+    @androidx.annotation.VisibleForTesting
+    fun setSpecialScheduleForTesting(list: List<SpecialScheduleRow>) {
+        this.specialSchedules = list
+    }
+
+    @androidx.annotation.VisibleForTesting
+    fun setSecondTermScheduleForTesting(list: List<BasicClassScheduleRow>) {
+        this.secondTermClassSchedule = list
     }
 }

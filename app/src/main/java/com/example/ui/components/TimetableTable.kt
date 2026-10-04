@@ -191,18 +191,19 @@ fun TimetableTable(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // 2. Timetable Grid Body (Periods 1-5 with clean column-enclosing highlight)
+            // 2. Timetable Grid Body (Periods 1-5 or dynamic maxPeriods with clean column-enclosing highlight)
+            val maxPeriods = maxOf(5, daySchedules.maxOfOrNull { it.periods.maxOfOrNull { p -> p.period } ?: 5 } ?: 5)
             val periodColWidth = if (daySchedules.size >= 6) 30.dp else if (daySchedules.size >= 5) 32.dp else 36.dp
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                // Period numbers column (1〜5)
+                // Period numbers column (1〜maxPeriods)
                 Column(
                     modifier = Modifier.width(periodColWidth),
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    for (period in 1..5) {
+                    for (period in 1..maxPeriods) {
                         Surface(
                             shape = RoundedCornerShape(4.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -222,7 +223,7 @@ fun TimetableTable(
                     }
                 }
 
-                // Day columns (each column contains periods 1 to 5 enclosed together)
+                // Day columns (each column contains periods 1 to maxPeriods enclosed together)
                 daySchedules.forEach { schedule ->
                     val isSelectedCol = schedule.date == selectedDate
                     val isTodayCol = schedule.date == today
@@ -257,7 +258,7 @@ fun TimetableTable(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            for (period in 1..5) {
+                            for (period in 1..maxPeriods) {
                                 val periodSchedule = schedule.periods.find { it.period == period }
                                     ?: PeriodSchedule(
                                         period = period,
@@ -402,13 +403,15 @@ fun TimetableTable(
                                             .fillMaxSize()
                                             .padding(horizontal = 2.dp, vertical = 2.dp)
                                     ) {
-                                        // 考査開始時間（左上）
-                                        if (periodSchedule.isExam && periodSchedule.startTime.isNotBlank()) {
+                                        // 開始時間（左上: 考査または特別時程）
+                                        if (periodSchedule.startTime.isNotBlank()) {
+                                            val timeTextColor = if (periodSchedule.isExam) examTimeTextColor
+                                                else if (isDark) Color(0xFFB0BEC5) else Color(0xFF455A64)
                                             Text(
                                                 text = periodSchedule.startTime,
                                                 fontSize = 7.5.sp,
                                                 lineHeight = 8.5.sp,
-                                                color = examTimeTextColor,
+                                                color = timeTextColor,
                                                 fontWeight = FontWeight.Bold,
                                                 modifier = Modifier
                                                     .align(Alignment.TopStart)
@@ -416,13 +419,15 @@ fun TimetableTable(
                                             )
                                         }
 
-                                        // 考査終了時間（左下）
-                                        if (periodSchedule.isExam && periodSchedule.endTime.isNotBlank()) {
+                                        // 終了時間（左下: 考査または特別時程）
+                                        if (periodSchedule.endTime.isNotBlank()) {
+                                            val timeTextColor = if (periodSchedule.isExam) examTimeTextColor
+                                                else if (isDark) Color(0xFFB0BEC5) else Color(0xFF455A64)
                                             Text(
                                                 text = periodSchedule.endTime,
                                                 fontSize = 7.5.sp,
                                                 lineHeight = 8.5.sp,
-                                                color = examTimeTextColor,
+                                                color = timeTextColor,
                                                 fontWeight = FontWeight.Bold,
                                                 modifier = Modifier
                                                     .align(Alignment.BottomStart)

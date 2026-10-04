@@ -154,6 +154,20 @@ data class SubjectMappingRow(
 )
 
 /**
+ * 特別時程時間割 (Special Schedule)
+ * date, period, subject, start_time, end_time
+ */
+data class SpecialScheduleRow(
+    val dateStr: String,
+    val month: Int,
+    val day: Int,
+    val period: Int,
+    val subject: String,    // 例: "A火1"
+    val startTime: String,  // 例: "8:50"
+    val endTime: String     // 例: "9:40"
+)
+
+/**
  * 理科演習L 4科目の識別定義 (物理L, 化学L, 生物L, 地学L)
  */
 enum class ScienceLType(val label: String, val shortName: String, val sortOrder: Int) {
@@ -164,16 +178,16 @@ enum class ScienceLType(val label: String, val shortName: String, val sortOrder:
 
     companion object {
         fun fromSubject(subject: String): ScienceLType? {
-            val s = subject.trim()
+            val s = CsvNormalizer.normalizeSubject(subject)
             if (s.isBlank()) return null
-            val hasL = s.contains("L", ignoreCase = true) || s.contains("ｌ")
+            val hasL = s.contains("L", ignoreCase = true)
             if (!hasL) return null
 
             return when {
-                s.contains("生物") || s == "生L" || s.startsWith("生L") || s == "生ｌ" || s.startsWith("生ｌ") -> BIOLOGY
-                s.contains("物理") || s == "物L" || s.startsWith("物L") || s == "物ｌ" || s.startsWith("物ｌ") -> PHYSICS
-                s.contains("化学") || s == "化L" || s.startsWith("化L") || s == "化ｌ" || s.startsWith("化ｌ") -> CHEMISTRY
-                s.contains("地学") || s == "地L" || s.startsWith("地L") || s == "地ｌ" || s.startsWith("地ｌ") -> GEOLOGY
+                s.contains("生物") || s == "生L" || s.startsWith("生L") -> BIOLOGY
+                s.contains("物理") || s == "物L" || s.startsWith("物L") -> PHYSICS
+                s.contains("化学") || s == "化L" || s.startsWith("化L") -> CHEMISTRY
+                s.contains("地学") || s == "地L" || s.startsWith("地L") -> GEOLOGY
                 else -> null
             }
         }
@@ -194,6 +208,8 @@ data class CsvUrlsConfig(
     val courseChangeSheetUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiStJCsPKp1ndi958BLOajBqizE_aIcO2Z0f9hPgiyPV19rnWB3qVcrLuVEaeCeE5ddaIudtX7VkzE/pub?gid=1592703701&single=true&output=csv",
     val examScheduleUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=436772895&single=true&output=csv",
     val subjectMappingUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=1612164498&single=true&output=csv",
+    val specialScheduleUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=2041839281&single=true&output=csv",
+    val secondTermClassUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=763994660&single=true&output=csv",
     val reportUrl: String = "https://forms.gle/KiiEAds2vtjAmsZ97",
     val timetableChangeUrl: String = "https://docs.google.com/forms/d/e/1FAIpQLSfTOKMLJz896qfq7OKSv7TRwxxJxX4VIqXT4npLcGmqWNyBkg/viewform?usp=preview"
 )
@@ -207,6 +223,7 @@ data class CsvSyncStatus(
     val lastSyncSuccess: Boolean = true,
     val lastSyncMessage: String = "未同期（設定済みURLから同期可能）",
     val basicCount: Int = 0,
+    val secondTermCount: Int = 0,
     val commonCount: Int = 0,
     val electiveCount: Int = 0,
     val eventCount: Int = 0,
@@ -215,5 +232,6 @@ data class CsvSyncStatus(
     val timetableChangeCount: Int = 0,
     val courseChangeCount: Int = 0,
     val examCount: Int = 0,
-    val subjectMappingCount: Int = 0
+    val subjectMappingCount: Int = 0,
+    val specialScheduleCount: Int = 0
 )

@@ -2022,6 +2022,8 @@ fun DeveloperMenuDialog(
     var courseChangeSheetUrl by remember(initialConfig) { mutableStateOf(initialConfig.courseChangeSheetUrl) }
     var examScheduleUrl by remember(initialConfig) { mutableStateOf(initialConfig.examScheduleUrl) }
     var subjectMappingUrl by remember(initialConfig) { mutableStateOf(initialConfig.subjectMappingUrl) }
+    var specialScheduleUrl by remember(initialConfig) { mutableStateOf(initialConfig.specialScheduleUrl) }
+    var secondTermClassUrl by remember(initialConfig) { mutableStateOf(initialConfig.secondTermClassUrl) }
     var reportUrl by remember(initialConfig) { mutableStateOf(initialConfig.reportUrl) }
     var timetableChangeUrl by remember(initialConfig) { mutableStateOf(initialConfig.timetableChangeUrl) }
 
@@ -2149,6 +2151,8 @@ fun DeveloperMenuDialog(
                                         courseChangeSheetUrl = def.courseChangeSheetUrl
                                         examScheduleUrl = def.examScheduleUrl
                                         subjectMappingUrl = def.subjectMappingUrl
+                                        specialScheduleUrl = def.specialScheduleUrl
+                                        secondTermClassUrl = def.secondTermClassUrl
                                         reportUrl = def.reportUrl
                                         timetableChangeUrl = def.timetableChangeUrl
                                         onResetToDefaultUrls()
@@ -2173,6 +2177,8 @@ fun DeveloperMenuDialog(
                                         courseChangeSheetUrl = ""
                                         examScheduleUrl = ""
                                         subjectMappingUrl = ""
+                                        specialScheduleUrl = ""
+                                        secondTermClassUrl = ""
                                     },
                                     contentPadding = PaddingValues(vertical = 6.dp, horizontal = 8.dp)
                                 ) {
@@ -2192,11 +2198,11 @@ fun DeveloperMenuDialog(
                                 modifier = Modifier.fillMaxWidth().testTag("input_common_schedule_url")
                             )
 
-                            // 2. クラス別時間割 URL
+                            // 2. クラス別時間割 (前期) URL
                             OutlinedTextField(
                                 value = basicClassUrl,
                                 onValueChange = { basicClassUrl = it },
-                                label = { Text("2. クラス別時間割 CSV URL", fontSize = 11.sp) },
+                                label = { Text("2. 前期クラス別時間割 CSV URL", fontSize = 11.sp) },
                                 singleLine = true,
                                 textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
                                 modifier = Modifier.fillMaxWidth().testTag("input_basic_class_url")
@@ -2282,6 +2288,26 @@ fun DeveloperMenuDialog(
                                 modifier = Modifier.fillMaxWidth().testTag("input_subject_mapping_url")
                             )
 
+                            // 11. 特別時程時間割 CSV URL
+                            OutlinedTextField(
+                                value = specialScheduleUrl,
+                                onValueChange = { specialScheduleUrl = it },
+                                label = { Text("11. 特別時程時間割 CSV URL (時程変更)", fontSize = 11.sp) },
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_special_schedule_url")
+                            )
+
+                            // 12. 後期クラス別時間割 CSV URL (10月6日〜)
+                            OutlinedTextField(
+                                value = secondTermClassUrl,
+                                onValueChange = { secondTermClassUrl = it },
+                                label = { Text("12. 後期クラス別時間割 CSV URL (10月6日〜)", fontSize = 11.sp) },
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_second_term_class_url")
+                            )
+
                             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                             Text("【外部リンク設定】", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
@@ -2335,7 +2361,9 @@ fun DeveloperMenuDialog(
                                         Text("データ概要・同期診断", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                                     }
                                     Text("・予定データ: ${syncStatus.commonCount}件", fontSize = 11.5.sp)
-                                    Text("・クラスデータ: ${syncStatus.basicCount}件", fontSize = 11.5.sp)
+                                    Text("・クラスデータ(前期): ${syncStatus.basicCount}件", fontSize = 11.5.sp)
+                                    Text("・クラスデータ(後期): ${syncStatus.secondTermCount}件", fontSize = 11.5.sp)
+                                    Text("・特別時程データ: ${syncStatus.specialScheduleCount}件", fontSize = 11.5.sp)
                                     Text("・選択科目データ: ${syncStatus.electiveCount}件", fontSize = 11.5.sp)
                                     Text("・行事予定データ: ${syncStatus.eventCount}件", fontSize = 11.5.sp)
                                     Text("・祝日データ: ${syncStatus.holidayCount}件", fontSize = 11.5.sp)
@@ -2403,6 +2431,8 @@ fun DeveloperMenuDialog(
                                 courseChangeSheetUrl = courseChangeSheetUrl,
                                 examScheduleUrl = examScheduleUrl,
                                 subjectMappingUrl = subjectMappingUrl,
+                                specialScheduleUrl = specialScheduleUrl,
+                                secondTermClassUrl = secondTermClassUrl,
                                 reportUrl = reportUrl,
                                 timetableChangeUrl = timetableChangeUrl
                             )

@@ -123,9 +123,10 @@ object CsvParser {
 
     /**
      * Parses Date string such as "4月1日", "04/01", "2026/07/20", "2026-08-24" into Month and Day.
+     * Fullwidth digits are automatically normalized to halfwidth.
      */
     fun parseMonthDay(dateStr: String): Pair<Int, Int>? {
-        val clean = dateStr.trim()
+        val clean = CsvNormalizer.normalizeDate(dateStr)
         if (clean.isBlank()) return null
 
         // 1. "4月13日" or "4月1日"
@@ -159,11 +160,11 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.size < 3) continue
-            val classId = row[0].trim()
-            val type = row.getOrNull(1)?.trim() ?: "A"
+            val classId = CsvNormalizer.normalizeClassId(row[0].trim())
+            val type = CsvNormalizer.normalizeAlphanumeric(row.getOrNull(1)?.trim() ?: "A")
             val dayOfWeek = row.getOrNull(2)?.trim() ?: "月"
-            val periods = (3..7).map { col ->
-                row.getOrNull(col)?.trim() ?: ""
+            val periods = (3 until maxOf(8, row.size)).map { col ->
+                CsvNormalizer.normalizeSubject(row.getOrNull(col)?.trim() ?: "")
             }
             if (classId.isNotBlank()) {
                 list.add(
@@ -191,10 +192,10 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val dateStr = row[0].trim()
+            val dateStr = CsvNormalizer.normalizeDate(row[0].trim())
             val (m, d) = parseMonthDay(dateStr) ?: continue
             val periods = (1..5).map { col ->
-                row.getOrNull(col)?.trim() ?: ""
+                CsvNormalizer.normalizeSubject(row.getOrNull(col)?.trim() ?: "")
             }
             list.add(
                 CommonScheduleRow(
@@ -220,7 +221,7 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val dateStr = row[0].trim()
+            val dateStr = CsvNormalizer.normalizeDate(row[0].trim())
             val (m, d) = parseMonthDay(dateStr) ?: continue
             val event = row.getOrNull(1)?.trim() ?: ""
             if (event.isNotBlank()) {
@@ -249,7 +250,7 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val dateStr = row[0].trim()
+            val dateStr = CsvNormalizer.normalizeDate(row[0].trim())
             val (m, d) = parseMonthDay(dateStr) ?: continue
             val holiday = row.getOrNull(1)?.trim() ?: ""
             if (holiday.isNotBlank()) {
@@ -280,8 +281,8 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.size < 2) continue
-            val origin = row[0].trim()
-            val elective = row.getOrNull(1)?.trim() ?: ""
+            val origin = CsvNormalizer.normalizeSubject(row[0].trim())
+            val elective = CsvNormalizer.normalizeSubject(row.getOrNull(1)?.trim() ?: "")
             val name = row.getOrNull(2)?.trim() ?: ""
             if (origin.isNotBlank() && elective.isNotBlank()) {
                 list.add(
@@ -362,11 +363,11 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.size < 4) continue
-            val dateStr = row[0].trim()
+            val dateStr = CsvNormalizer.normalizeDate(row[0].trim())
             val (m, d) = parseMonthDay(dateStr) ?: continue
-            val classId = row[1].trim()
-            val period = row[2].trim().toIntOrNull() ?: 1
-            val subject = row[3].trim()
+            val classId = CsvNormalizer.normalizeClassId(row[1].trim())
+            val period = CsvNormalizer.normalizePeriod(row[2].trim())
+            val subject = CsvNormalizer.normalizeSubject(row[3].trim())
 
             if (subject.isNotBlank()) {
                 list.add(
@@ -398,11 +399,11 @@ object CsvParser {
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.size < 4) continue
-            val dateStr = row[0].trim()
+            val dateStr = CsvNormalizer.normalizeDate(row[0].trim())
             val (m, d) = parseMonthDay(dateStr) ?: continue
-            val period = row[1].trim().toIntOrNull() ?: 1
-            val previousCourse = row[2].trim()
-            val newCourse = row[3].trim()
+            val period = CsvNormalizer.normalizePeriod(row[1].trim())
+            val previousCourse = CsvNormalizer.normalizeSubject(row[2].trim())
+            val newCourse = CsvNormalizer.normalizeSubject(row[3].trim())
 
             if (newCourse.isNotBlank()) {
                 list.add(
@@ -488,16 +489,18 @@ object CsvParser {
         for (i in startRowIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val dateStr = row.getOrNull(dateIdx)?.trim() ?: ""
+            val dateStr = CsvNormalizer.normalizeDate(row.getOrNull(dateIdx)?.trim() ?: "")
             val (m, d) = parseMonthDay(dateStr) ?: continue
 
             val periodStr = row.getOrNull(periodIdx)?.trim() ?: "1"
-            val period = periodStr.filter { it.isDigit() }.toIntOrNull() ?: 1
-            val subject = row.getOrNull(subjectIdx)?.trim() ?: ""
-            val startTime = row.getOrNull(startIdx)?.trim() ?: ""
-            val endTime = row.getOrNull(endIdx)?.trim() ?: ""
-            val classroom = if (roomIdx >= 0) row.getOrNull(roomIdx)?.trim() ?: "" else ""
-            val classId = if (classIdx >= 0) row.getOrNull(classIdx)?.trim() ?: "全" else "全"
+            val period = CsvNormalizer.normalizePeriod(periodStr)
+            val subject = CsvNormalizer.normalizeSubject(row.getOrNull(subjectIdx)?.trim() ?: "")
+            val startTime = CsvNormalizer.normalizeTime(row.getOrNull(startIdx)?.trim() ?: "")
+            val endTime = CsvNormalizer.normalizeTime(row.getOrNull(endIdx)?.trim() ?: "")
+            val rawRoom = if (roomIdx >= 0) row.getOrNull(roomIdx)?.trim() ?: "" else ""
+            val classroom = CsvNormalizer.normalizeAlphanumeric(rawRoom)
+            val rawClass = if (classIdx >= 0) row.getOrNull(classIdx)?.trim() ?: "全" else "全"
+            val classId = CsvNormalizer.normalizeClassId(if (rawClass.isNotBlank()) rawClass else "全")
 
             if (subject.isNotBlank()) {
                 list.add(
@@ -547,10 +550,95 @@ object CsvParser {
         for (i in startRowIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val source = row.getOrNull(sourceIdx)?.trim() ?: ""
-            val target = row.getOrNull(targetIdx)?.trim() ?: ""
+            val source = CsvNormalizer.normalizeSubject(row.getOrNull(sourceIdx)?.trim() ?: "")
+            val target = CsvNormalizer.normalizeSubject(row.getOrNull(targetIdx)?.trim() ?: "")
             if (source.isNotBlank() && target.isNotBlank()) {
                 list.add(SubjectMappingRow(source = source, target = target))
+            }
+        }
+        return list
+    }
+
+    /**
+     * 11. 特別時程時間割 (Special Schedule) のパース
+     * Headers / Columns: date, period, subject, start_time, end_time
+     */
+    fun parseSpecialSchedule(csvText: String): List<SpecialScheduleRow> {
+        val rows = parseRawCsv(csvText)
+        if (rows.isEmpty()) return emptyList()
+
+        val list = mutableListOf<SpecialScheduleRow>()
+        val header = rows.first()
+        val hasHeader = header.any { h ->
+            val lower = h.lowercase()
+            lower.contains("date") || lower.contains("日付") || lower == "日" ||
+            lower.contains("period") || lower.contains("時限") || lower.contains("限") ||
+            lower.contains("subject") || lower.contains("科目") ||
+            lower.contains("start") || lower.contains("開始") ||
+            lower.contains("end") || lower.contains("終了")
+        }
+
+        var dateIdx = 0
+        var periodIdx = 1
+        var subjectIdx = 2
+        var startIdx = 3
+        var endIdx = 4
+
+        val startRowIdx = if (hasHeader) {
+            var foundDate = false
+            var foundPeriod = false
+            var foundSubject = false
+            var foundStart = false
+            var foundEnd = false
+
+            for (c in header.indices) {
+                val col = header[c].lowercase()
+                if (!foundDate && (col.contains("date") || col.contains("日付") || col == "日")) {
+                    dateIdx = c
+                    foundDate = true
+                } else if (!foundPeriod && (col.contains("period") || col.contains("時限") || col.contains("限"))) {
+                    periodIdx = c
+                    foundPeriod = true
+                } else if (!foundSubject && (col.contains("subject") || col.contains("科目") || col.contains("教科") || col.contains("コース"))) {
+                    subjectIdx = c
+                    foundSubject = true
+                } else if (!foundStart && (col.contains("start") || col.contains("開始") || col.contains("自"))) {
+                    startIdx = c
+                    foundStart = true
+                } else if (!foundEnd && (col.contains("end") || col.contains("終了") || col.contains("至"))) {
+                    endIdx = c
+                    foundEnd = true
+                }
+            }
+            1
+        } else {
+            0
+        }
+
+        for (i in startRowIdx until rows.size) {
+            val row = rows[i]
+            if (row.isEmpty()) continue
+            val dateStr = CsvNormalizer.normalizeDate(row.getOrNull(dateIdx)?.trim() ?: "")
+            val (m, d) = parseMonthDay(dateStr) ?: continue
+
+            val periodStr = row.getOrNull(periodIdx)?.trim() ?: "1"
+            val period = CsvNormalizer.normalizePeriod(periodStr)
+            val subject = CsvNormalizer.normalizeSubject(row.getOrNull(subjectIdx)?.trim() ?: "")
+            val startTime = CsvNormalizer.normalizeTime(row.getOrNull(startIdx)?.trim() ?: "")
+            val endTime = CsvNormalizer.normalizeTime(row.getOrNull(endIdx)?.trim() ?: "")
+
+            if (subject.isNotBlank()) {
+                list.add(
+                    SpecialScheduleRow(
+                        dateStr = dateStr,
+                        month = m,
+                        day = d,
+                        period = period,
+                        subject = subject,
+                        startTime = startTime,
+                        endTime = endTime
+                    )
+                )
             }
         }
         return list

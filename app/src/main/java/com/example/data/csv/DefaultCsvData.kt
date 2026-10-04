@@ -152,4 +152,7 @@ source,target
 数特,数学特講
 生活,生活科学
 """.trimIndent()
+
+    const val SPECIAL_SCHEDULE_CSV = ""
+    const val SECOND_TERM_CLASS_CSV = ""
 }

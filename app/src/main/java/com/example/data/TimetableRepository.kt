@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import com.example.data.csv.CsvSyncManager
+import com.example.data.csv.CsvNormalizer
 import com.example.data.csv.AppUpdateInfo
 import com.example.data.csv.CsvSyncStatus
 import com.example.data.csv.CsvUrlsConfig
@@ -506,8 +507,9 @@ class TimetableRepository(private val context: Context) {
         // User electives for this class
         val userElectives = getElectiveSelectionsForClass(classGroup.id)
 
-        // Periods 1 to 5 generated from CSV data
-        val periods = (1..5).map { period ->
+        // Periods dynamically generated from CSV data (1..5 or 6, 7 if special/exam schedule)
+        val maxPeriods = csvSyncManager.getMaxPeriodsForDate(date)
+        val periods = (1..maxPeriods).map { period ->
             csvSyncManager.resolvePeriodSchedule(classGroup, date, period, userElectives)
         }
 
@@ -590,13 +592,13 @@ class TimetableRepository(private val context: Context) {
         val rawTrimmed = query.trim()
         if (rawTrimmed.isBlank()) return emptyList()
 
-        val normalized = normalizeQuery(rawTrimmed)
+        val normalized = CsvNormalizer.normalizeSearch(rawTrimmed)
         val results = mutableListOf<SearchResultItem>()
         val today = LocalDate.now()
         val formatter = DateTimeFormatter.ofPattern("M月d日 (E)", Locale.JAPANESE)
 
         // Check if query is a month/day search (e.g. "8/26", "8月26", "8-26")
-        val dateMatch = Regex("""^(\d{1,2})[/月\-](\d{1,2})日?""").find(rawTrimmed)
+        val dateMatch = Regex("""^(\d{1,2})[/月\-](\d{1,2})日?""").find(CsvNormalizer.normalizeDigits(rawTrimmed))
         val searchMonth = dateMatch?.groupValues?.get(1)?.toIntOrNull()
         val searchDay = dateMatch?.groupValues?.get(2)?.toIntOrNull()
 
@@ -708,21 +710,7 @@ class TimetableRepository(private val context: Context) {
     }
 
     private fun normalizeQuery(input: String): String {
-        // Convert fullwidth alphanumeric/katakana to standard normalized lowercase
-        var s = input.trim().lowercase(Locale.JAPANESE)
-        // Fullwidth numbers to halfwidth
-        val fullwidthNumbers = "０１２３４５６７８９"
-        val halfwidthNumbers = "0123456789"
-        for (i in fullwidthNumbers.indices) {
-            s = s.replace(fullwidthNumbers[i], halfwidthNumbers[i])
-        }
-        // Fullwidth alphabet to halfwidth
-        val fullwidthAlpha = "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ"
-        val halfwidthAlpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".lowercase()
-        for (i in fullwidthAlpha.indices) {
-            s = s.replace(fullwidthAlpha[i], halfwidthAlpha[i % halfwidthAlpha.length])
-        }
-        return s
+        return CsvNormalizer.normalizeSearch(input)
     }
 
     // Memo management utilities
