@@ -46,8 +46,24 @@ class AppUpdateCheckUnitTest {
         val list = CsvParser.parseUpdateHistory(csv)
         assertEquals(1, list.size)
         assertEquals("1.0.0", list[0].version)
-        assertEquals("・軽微な修整", list[0].dateStr)
-        assertEquals("example.com", list[0].contents)
+        assertEquals("・軽微な修整", list[0].contents)
+        assertEquals("", list[0].dateStr)
+        assertFalse(list[0].contents.contains("example.com"))
+    }
+
+    @Test
+    fun parseUpdateHistory_withActualDataAndNoUrls() {
+        val csv = """
+            ver,info,link
+            1.3.1,"・考査時間割の理科演習Lの表示を改善・バージョン番号が更新されていなかった不具合を修正",https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.3.1/timetable-app-v1.3.1.apk
+        """.trimIndent()
+
+        val list = CsvParser.parseUpdateHistory(csv)
+        assertEquals(1, list.size)
+        assertEquals("1.3.1", list[0].version)
+        assertEquals("・考査時間割の理科演習Lの表示を改善\n・バージョン番号が更新されていなかった不具合を修正", list[0].contents)
+        assertFalse(list[0].contents.contains("github.com"))
+        assertFalse(list[0].contents.contains(".apk"))
     }
 
     @Test

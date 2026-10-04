@@ -298,29 +298,71 @@ object CsvParser {
     }
 
     // 6. Parse 更新情報
-    // Headers: versions/ver, dates/info, contents/link
+    // Headers: ver/versions, info/dates/contents, link (URLは除外)
     fun parseUpdateHistory(csvText: String): List<UpdateHistoryRow> {
         val rows = parseRawCsv(csvText)
         if (rows.isEmpty()) return emptyList()
 
         val list = mutableListOf<UpdateHistoryRow>()
-        val startIdx = if (rows.first().getOrNull(0)?.contains("ver", ignoreCase = true) == true) 1 else 0
+        val header = rows.first().map { it.trim().lowercase() }
+        val hasHeader = header.any { it.contains("ver") || it.contains("info") || it.contains("link") || it.contains("date") || it.contains("content") }
+        val startIdx = if (hasHeader) 1 else 0
+
+        var verCol = 0
+        var infoCol = 1
+        var dateCol = -1
+
+        if (hasHeader) {
+            val v = header.indexOfFirst { it.contains("ver") }
+            if (v >= 0) verCol = v
+
+            val d = header.indexOfFirst { it.contains("date") || it.contains("日付") || it.contains("日") }
+            if (d >= 0) dateCol = d
+
+            val i = header.indexOfFirst { it.contains("info") || it.contains("content") || it.contains("内容") || it.contains("更新") }
+            if (i >= 0) {
+                infoCol = i
+            } else if (dateCol >= 0) {
+                infoCol = (0 until header.size).firstOrNull { it != verCol && it != dateCol && !header[it].contains("link") } ?: 2
+            }
+        }
 
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val version = row[0].trim()
-            val dateStr = row.getOrNull(1)?.trim() ?: ""
-            val contents = row.getOrNull(2)?.trim() ?: ""
-            if (version.isNotBlank()) {
-                list.add(
-                    UpdateHistoryRow(
-                        version = version,
-                        dateStr = dateStr,
-                        contents = contents
-                    )
-                )
+            val version = row.getOrNull(verCol)?.trim() ?: ""
+            if (version.isBlank()) continue
+
+            var dateStr = if (dateCol >= 0) row.getOrNull(dateCol)?.trim() ?: "" else ""
+            var rawContents = row.getOrNull(infoCol)?.trim() ?: ""
+
+            // ヘッダーがなく、3列以上かつ1列目が日付形式の場合
+            if (!hasHeader && row.size >= 3) {
+                val c1 = row[1].trim()
+                val c2 = row[2].trim()
+                if (c1.matches(Regex("""\d{1,4}[-/年]\d{1,2}[-/月]?\d{0,2}日?"""))) {
+                    dateStr = c1
+                    rawContents = c2
+                }
             }
+
+            // 「URLはいりません」: URLを除外
+            var cleanedContents = rawContents
+                .replace(Regex("""https?://\S+"""), "")
+                .trim()
+
+            // 箇条書きが連結している場合は改行で整形
+            cleanedContents = cleanedContents
+                .replace(Regex("""(?<=[^\n・])\s*・"""), "\n・")
+                .trim()
+
+            list.add(
+                UpdateHistoryRow(
+                    version = version,
+                    dateStr = dateStr,
+                    contents = cleanedContents
+                )
+            )
         }
         return list
     }

@@ -2983,25 +2983,51 @@ fun UpdateHistoryDialog(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             ),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(history.version, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        val displayVer = if (history.version.startsWith("v", ignoreCase = true)) {
+                                            history.version
+                                        } else {
+                                            "v${history.version}"
+                                        }
+                                        Text(
+                                            text = displayVer,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            fontSize = 13.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
                                     if (history.dateStr.isNotBlank()) {
-                                        Text(history.dateStr, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(
+                                            text = history.dateStr,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
                                 if (history.contents.isNotBlank()) {
-                                    Text(history.contents, fontSize = 12.sp, lineHeight = 17.sp)
+                                    Text(
+                                        text = history.contents,
+                                        fontSize = 13.sp,
+                                        lineHeight = 19.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
                                 }
                             }
                         }
