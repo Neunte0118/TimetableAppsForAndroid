@@ -235,5 +235,53 @@ class ExampleRobolectricTest {
     com.example.notification.NotificationHelper.scheduleNextClassAlarms(context)
     com.example.notification.NotificationHelper.cancelNextClassAlarms(context)
   }
+
+  @Test
+  fun `verify HR classroom subjects have distinctive subject colors and are not unselected`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val repo = TimetableRepository.getInstance(context)
+    val groups = repo.subjectColorGroups.value
+
+    val japaneseColor = groups.find { it.id == "japanese" }!!.toColorLong()
+    val englishColor = groups.find { it.id == "english" }!!.toColorLong()
+    val peHrColor = groups.find { it.id == "pe_and_hr" }!!.toColorLong()
+
+    // 1. HR Classroom Japanese subjects
+    assertEquals(japaneseColor, com.example.model.SubjectColorDefaults.getColorForSubject("現代文", groups))
+    assertEquals(japaneseColor, com.example.model.SubjectColorDefaults.getColorForSubject("古典", groups))
+    assertEquals(japaneseColor, com.example.model.SubjectColorDefaults.getColorForSubject("現文", groups))
+    assertEquals(japaneseColor, com.example.model.SubjectColorDefaults.getColorForSubject("現文or英長or英W", groups))
+
+    // 2. HR Classroom English subjects
+    assertEquals(englishColor, com.example.model.SubjectColorDefaults.getColorForSubject("英語W", groups))
+    assertEquals(englishColor, com.example.model.SubjectColorDefaults.getColorForSubject("英語R", groups))
+    assertEquals(englishColor, com.example.model.SubjectColorDefaults.getColorForSubject("英語長文", groups))
+    assertEquals(englishColor, com.example.model.SubjectColorDefaults.getColorForSubject("IBA Ⅳ", groups))
+    assertEquals(englishColor, com.example.model.SubjectColorDefaults.getColorForSubject("英WorIBA", groups))
+
+    // 3. HR Classroom Homeroom subjects
+    assertEquals(peHrColor, com.example.model.SubjectColorDefaults.getColorForSubject("HR", groups))
+    assertEquals(peHrColor, com.example.model.SubjectColorDefaults.getColorForSubject("LHR", groups))
+    assertEquals(peHrColor, com.example.model.SubjectColorDefaults.getColorForSubject("進路HR", groups))
+
+    // 4. Verify CsvSyncManager resolves HR subjects as common (isUnselectedElective = false)
+    val manager = repo.csvSyncManager
+    val classGroup1 = com.example.model.ClassGroup(id = "1", name = "1組", grade = 1, section = "1")
+    val secondTermCsv = """
+        class,type,day_of_week,first_period,second_period,third_period,fourth_period,fifth_period
+        1,A,火,A2,E2,古典,英語W,英語R
+        1,B,火,A2,E1,IBA Ⅳ,現代文,英語R
+    """.trimIndent()
+    manager.setSecondTermScheduleForTesting(com.example.data.csv.CsvParser.parseBasicClassSchedule(secondTermCsv))
+
+    val date = LocalDate.of(2026, 10, 6)
+    val pKoten = manager.resolvePeriodSchedule(classGroup1, date, 3, emptyMap())
+    assertEquals("古典", pKoten.subject)
+    assertTrue("Koten is not unselected", !pKoten.isUnselectedElective)
+
+    val pEigoW = manager.resolvePeriodSchedule(classGroup1, date, 4, emptyMap())
+    assertEquals("英語W", pEigoW.subject)
+    assertTrue("EigoW is not unselected", !pEigoW.isUnselectedElective)
+  }
 }
 

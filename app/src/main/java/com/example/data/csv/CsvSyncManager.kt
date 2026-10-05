@@ -968,8 +968,12 @@ class CsvSyncManager(private val context: Context) {
         // 4. Resolve classroom from CSV (選択科目 name column)
         val classroom = resolveClassroom(resolvedSubject, currentOrigin, classGroup)
 
+        // 共通科目またはHR教室の授業（自教室）は選択コマではなく共通必修のため未選択扱いしない
+        val isCommon = isCommonSubject(resolvedSubject, currentOrigin) ||
+            classroom.contains("組教室") || classroom == "HR教室" || classroom == "自教室"
+
         // 選択科目のコマだが未選択（自分の選択科目が未指定）かどうかを判定
-        val isElectiveSlot = electives.any {
+        val isElectiveSlot = !isCommon && electives.any {
             isSubjectMatch(it.origin, currentSubject) || (currentOrigin.isNotBlank() && isSubjectMatch(it.origin, currentOrigin))
         }
         val isUserChosen = userElectives.values.any { isSubjectMatch(it, resolvedSubject) }
@@ -1084,8 +1088,10 @@ class CsvSyncManager(private val context: Context) {
     private fun isCommonSubject(subjectName: String, originName: String): Boolean {
         val targets = listOf(
             "現代文", "現読", "古典", "古講", "英語R", "英語長", "長",
-            "英語W", "英語Wt", "W", "Wt", "W/Wt", "英語W/Wt", "HR", "LHR", "ホームルーム",
-            "IbA", "iV", "ⅠbA", "ⅠV", "IV", "Ib", "IA", "IIb", "Ⅱb"
+            "英語W", "英語Wt", "W", "Wt", "W/Wt", "英語W/Wt", "HR", "LHR", "ホームルーム", "進路HR",
+            "IbA", "iV", "ⅠbA", "ⅠV", "IV", "Ib", "IA", "IIb", "Ⅱb",
+            "現文", "英長", "英W", "英Wt", "IBA", "IBA Ⅳ", "IBA IV",
+            "探究", "総探", "総合探究", "総合的な探究の時間", "学問発見講座", "始業式", "終業式", "式典"
         )
         val s = subjectName.trim()
         val o = originName.trim()
@@ -1284,7 +1290,11 @@ class CsvSyncManager(private val context: Context) {
             )
         }
 
-        val colorHex = 0xFF5C6BC0
+        val colorHex = if (sub.isNotBlank()) {
+            SubjectColorDefaults.getColorForSubject(sub)
+        } else {
+            0xFF5C6BC0
+        }
 
         return PeriodSchedule(
             period = period,

@@ -27,6 +27,7 @@ import java.util.Locale
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 
 /**
  * Clean & modern timetable grid component.
@@ -338,21 +339,15 @@ fun TimetableTable(
                                     isChangedActive -> {
                                         if (isSubjectColorEnabled && viewMode == TimetableViewMode.TIMETABLE && periodSchedule.subject.isNotBlank()) {
                                             val colorLong = SubjectColorDefaults.getColorForSubject(periodSchedule.subject, subjectColorGroups)
-                                            val baseColor = Color(colorLong)
-                                            if (isDark && baseColor.luminance() < 0.35f) Color(0xFFCFD5E2) else baseColor
+                                            adjustSubjectColorForTheme(Color(colorLong), isDark)
                                         } else {
                                             if (isDark) Color(0xFFFFD54F) else Color(0xFFBF360C)
                                         }
                                     }
-                                    // 4. 教科色分け有効時（ダークモードで明度が低すぎる未選択・その他等の色は明度を高めて見やすく調整）
+                                    // 4. 教科色分け有効時（HR教室授業を含め各教科の鮮やかな色味を保ちつつダーク/ライト共に明瞭に表示）
                                     viewMode == TimetableViewMode.TIMETABLE && isSubjectColorEnabled && periodSchedule.subject.isNotBlank() -> {
                                         val colorLong = SubjectColorDefaults.getColorForSubject(periodSchedule.subject, subjectColorGroups)
-                                        val baseColor = Color(colorLong)
-                                        if (isDark) {
-                                            if (baseColor.luminance() < 0.35f) Color(0xFFCFD5E2) else baseColor
-                                        } else {
-                                            if (baseColor.luminance() > 0.85f) Color(0xFF555A64) else baseColor
-                                        }
+                                        adjustSubjectColorForTheme(Color(colorLong), isDark)
                                     }
                                     // 5. 通常文字色
                                     else -> {
@@ -484,6 +479,28 @@ fun TimetableTable(
                 }
             }
         }
+    }
+}
+
+private fun adjustSubjectColorForTheme(baseColor: Color, isDark: Boolean): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(baseColor.toArgb(), hsv)
+    return if (isDark) {
+        if (hsv[1] < 0.15f) {
+            // 未選択・グレー系は明度を高めて視認性向上
+            hsv[2] = hsv[2].coerceAtLeast(0.85f)
+        } else {
+            // 各教科（国語赤、英語紫、数学青、理科緑、HRオレンジ等）の鮮やかな色味を保ちつつ、ダークモードで視認可能な明度に調整
+            hsv[1] = hsv[1].coerceIn(0.40f, 0.75f)
+            hsv[2] = hsv[2].coerceAtLeast(0.88f)
+        }
+        Color(android.graphics.Color.HSVToColor(hsv))
+    } else {
+        if (hsv[1] >= 0.15f) {
+            hsv[1] = hsv[1].coerceAtLeast(0.55f)
+            hsv[2] = hsv[2].coerceAtMost(0.80f)
+        }
+        Color(android.graphics.Color.HSVToColor(hsv))
     }
 }
 

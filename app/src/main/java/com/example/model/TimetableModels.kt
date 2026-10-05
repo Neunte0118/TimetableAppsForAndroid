@@ -137,10 +137,10 @@ object SubjectColorDefaults {
             saturation = 0.50f,
             value = 0.90f,
             subjects = listOf(
-                "国語", "現代文", "古典",
-                "現読①", "現読②", "現読③", "現読④",
-                "古講①", "古講②", "古講③", "古講④",
-                "古典探求"
+                "国語", "現代文", "現文", "古典", "古講", "古典講読", "古典探求", "古典探究", "古探",
+                "現読①", "現読②", "現読③", "現読④", "現世読", "現代世界を読む",
+                "国語表現", "言文", "言語文化", "論国", "論理国語", "文国", "文学国語",
+                "現文or英長or英W"
             )
         ),
         SubjectColorGroup(
@@ -163,10 +163,13 @@ object SubjectColorDefaults {
             name = "英語",
             hue = 291.0f,
             saturation = 0.48f,
-            value = 0.78f,
+            value = 0.88f,
             subjects = listOf(
-                "英語R", "英語W", "英語Wt", "英語長文",
-                "総英 Ⅲ長", "総英 ⅢR"
+                "英語", "英語R", "英語W", "英語Wt", "英語長文", "英語長", "英長", "英W", "英Wt",
+                "W", "Wt", "W/Wt", "英語W/Wt", "英WorIBA", "英W/IBA",
+                "総英 Ⅲ長", "総英 ⅢR", "コミ英", "論表", "コミュニケーション英語", "論理・表現",
+                "IBA", "IBA Ⅳ", "IBA IV", "IBA 4", "IBA1", "IBA2", "IBA3", "IBA4",
+                "IbA", "ⅠbA", "iV", "ⅠV", "IV", "Ib", "IA", "IIb", "Ⅱb"
             )
         ),
         SubjectColorGroup(
@@ -213,11 +216,14 @@ object SubjectColorDefaults {
         SubjectColorGroup(
             id = "pe_and_hr",
             name = "体育・HR",
-            hue = 14.0f,
-            saturation = 0.72f,
-            value = 0.73f,
+            hue = 18.0f,
+            saturation = 0.65f,
+            value = 0.88f,
             subjects = listOf(
-                "HR", "進路HR", "体育共修", "体育別修"
+                "HR", "LHR", "ホームルーム", "進路HR", "HR教室",
+                "体育", "体育共修", "体育別修", "保健", "保体",
+                "学問発見講座", "総合探究", "総探", "探究", "総合的な探究の時間",
+                "始業式等", "始業式", "終業式", "式典", "道徳", "情報"
             )
         ),
         SubjectColorGroup(
@@ -249,14 +255,22 @@ object SubjectColorDefaults {
 
     fun getColorForSubject(subject: String, groups: List<SubjectColorGroup>): Long {
         val trimmed = subject.trim()
-        val found = groups.find { grp -> grp.subjects.any { it.equals(trimmed, ignoreCase = true) } }
-        if (found != null) return found.toColorLong()
+        if (trimmed.isBlank()) return 0xFF90A4AEL
+
+        // 1. グループ完全一致
+        val directFound = groups.find { grp -> grp.subjects.any { it.equals(trimmed, ignoreCase = true) } }
+        if (directFound != null) return directFound.toColorLong()
+
+        // 2. defaultSubjectColors キャッシュ照合
         if (defaultSubjectColors.containsKey(trimmed)) return defaultSubjectColors[trimmed]!!
 
-        if (trimmed.contains('/')) {
-            val parts = trimmed.split('/')
+        // 3. 複合科目・略称の分解照合 (例: 現文or英長or英W, 英WorIBA, A/B, 現文・英語)
+        val delimiterRegex = Regex("""/|／|or|OR|・|、""")
+        if (trimmed.contains(delimiterRegex)) {
+            val parts = trimmed.split(delimiterRegex)
             for (part in parts) {
                 val p = part.trim()
+                if (p.isBlank()) continue
                 val partFound = groups.find { grp ->
                     grp.subjects.any {
                         it.equals(p, ignoreCase = true) ||
@@ -267,7 +281,25 @@ object SubjectColorDefaults {
                 if (partFound != null) return partFound.toColorLong()
             }
         }
-        return 0xFF90A4AEL
+
+        // 4. 科目キーワード・プレフィックス判定
+        val keywordFound = groups.find { grp ->
+            when (grp.id) {
+                "japanese" -> listOf("国語", "現代文", "現文", "古典", "古講", "現読", "言文", "論国", "文国").any { trimmed.contains(it) }
+                "english" -> listOf("英語", "英W", "英Wt", "英長", "IBA", "IbA", "ⅠbA", "コミ英", "論表").any { trimmed.contains(it, ignoreCase = true) }
+                "math" -> listOf("数学", "数講", "数特", "数演", "ⅡS", "ⅡL").any { trimmed.contains(it) }
+                "science" -> listOf("理科", "化学", "物理", "生物", "地学", "理演", "物L", "化L", "生L", "地L", "化S", "物S", "生S").any { trimmed.contains(it) }
+                "social" -> listOf("社会", "地理", "日本史", "世界史", "倫政", "地総", "歴総", "公共", "日特", "世特", "日講", "世講").any { trimmed.contains(it) }
+                "art" -> listOf("音楽", "美術", "書道", "音特", "美特", "書特").any { trimmed.contains(it) }
+                "pe_and_hr" -> listOf("体育", "HR", "LHR", "ホームルーム", "進路HR", "探究", "総探", "始業式", "終業式", "式典", "学問発見").any { trimmed.contains(it, ignoreCase = true) }
+                else -> false
+            }
+        }
+        if (keywordFound != null) return keywordFound.toColorLong()
+
+        // 5. フォールバック
+        val electiveGroup = groups.find { it.id == "elective_course" }
+        return electiveGroup?.toColorLong() ?: 0xFF90A4AEL
     }
 }
 

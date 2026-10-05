@@ -99,11 +99,11 @@ class TimetableRepository(private val context: Context) {
     private fun loadSubjectColorGroups(): List<SubjectColorGroup> {
         val version = prefs.getInt("subject_color_groups_version", 0)
         val jsonStr = prefs.getString("subject_color_groups_json", null)
-        if (version < 3 || jsonStr.isNullOrBlank()) {
-            // 新しいデフォルトグループ（未選択・その他の明度向上）を保存して反映
+        if (version < 4 || jsonStr.isNullOrBlank()) {
+            // 新しいデフォルトグループ（HR教室授業対応、未選択・その他の明度向上）を保存して反映
             val defaults = SubjectColorDefaults.defaultGroups
             persistSubjectColorGroups(defaults)
-            prefs.edit().putInt("subject_color_groups_version", 3).apply()
+            prefs.edit().putInt("subject_color_groups_version", 4).apply()
             return defaults
         }
         return try {
@@ -130,18 +130,18 @@ class TimetableRepository(private val context: Context) {
                 list.add(SubjectColorGroup(id, name, hue, sat, value, subjects))
             }
             // 古い不完全な設定の場合は最新デフォルトに更新
-            if (list.isEmpty() || list.size < 10 || list.none { it.id == "english" }) {
+            if (list.isEmpty() || list.size < 10 || list.none { it.id == "english" } || list.none { it.id == "pe_and_hr" }) {
                 val defaults = SubjectColorDefaults.defaultGroups
                 persistSubjectColorGroups(defaults)
-                prefs.edit().putInt("subject_color_groups_version", 3).apply()
+                prefs.edit().putInt("subject_color_groups_version", 4).apply()
                 defaults
             } else {
                 list
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             val defaults = SubjectColorDefaults.defaultGroups
             persistSubjectColorGroups(defaults)
-            prefs.edit().putInt("subject_color_groups_version", 3).apply()
+            prefs.edit().putInt("subject_color_groups_version", 4).apply()
             defaults
         }
     }
