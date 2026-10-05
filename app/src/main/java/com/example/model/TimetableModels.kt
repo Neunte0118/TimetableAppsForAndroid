@@ -43,7 +43,7 @@ data class PeriodSchedule(
     val classroom: String,      // 教室 (例: 第1社会科室, LL教室)
     val teacher: String = "",   // 担当教員
     val memo: String = "",       // 持ち物・小テストなどのメモ
-    val colorHex: Long = 0x594e52,
+    val colorHex: Long = 0xFF90A4AEL,
     val isChanged: Boolean = false, // 時間割変更フラグ
     val isExam: Boolean = false,    // 考査フラグ
     val startTime: String = "",     // 開始時間 (例: 8:50)
@@ -223,9 +223,9 @@ object SubjectColorDefaults {
         SubjectColorGroup(
             id = "elective_course",
             name = "未選択",
-            hue = 338.0f,
-            saturation = 0.12f,
-            value = 0.35f,
+            hue = 220.0f,
+            saturation = 0.08f,
+            value = 0.82f,
             subjects = listOf(
                 "数Ⅱ S/La", "数Ⅱ S/Lb",
                 "G1", "G2", "E1", "E2", "A1", "A2", "J1", "J2", "K1", "K2", "C1", "C2", "F1", "F2", "H1", "H2"
@@ -244,7 +244,7 @@ object SubjectColorDefaults {
     }
 
     fun getColorForSubject(subject: String): Long {
-        return defaultSubjectColors[subject] ?: 0xFF594e52L
+        return defaultSubjectColors[subject] ?: 0xFF90A4AEL
     }
 
     fun getColorForSubject(subject: String, groups: List<SubjectColorGroup>): Long {
@@ -267,7 +267,7 @@ object SubjectColorDefaults {
                 if (partFound != null) return partFound.toColorLong()
             }
         }
-        return 0xFF594e52L
+        return 0xFF90A4AEL
     }
 }
 

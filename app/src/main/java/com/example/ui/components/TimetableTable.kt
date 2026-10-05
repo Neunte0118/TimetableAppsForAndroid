@@ -282,12 +282,12 @@ fun TimetableTable(
                                 val isUnselectedActive = periodSchedule.isUnselectedElective && hasContent
 
                                 val surfaceBgColor = when {
-                                    // 1. 未選択科目・自分の選択科目でない科目（灰色、ダークテーマでは明度を変える）
+                                    // 1. 未選択科目・自分の選択科目でない科目（灰色：ダークテーマ・ライトテーマ共に明度を高めて視認性向上）
                                     isUnselectedActive -> {
                                         if (isDark) {
-                                            if (isSelectedCol) Color(0xFF424242) else Color(0xFF303030)
+                                            if (isSelectedCol) Color(0xFF4C525E) else Color(0xFF3B404A)
                                         } else {
-                                            if (isSelectedCol) Color(0xFFE0E0E0) else Color(0xFFEEEEEE)
+                                            if (isSelectedCol) Color(0xFFDCE0E8) else Color(0xFFEEF0F4)
                                         }
                                     }
                                     // 2. 考査：通常科目（紫色）
@@ -326,9 +326,9 @@ fun TimetableTable(
 
                                 // テキスト色の計算（教科色分け・ダークテーマ・時間割変更時の視認性を完全保証）
                                 val calculatedTextColor = when {
-                                    // 1. 未選択科目・自分の選択科目でない科目（灰色）
+                                    // 1. 未選択科目・自分の選択科目でない科目（灰色：ダークモード・ライトモード共に明度を高めて明瞭に表示）
                                     isUnselectedActive -> {
-                                        if (isDark) Color(0xFF9E9E9E) else Color(0xFF757575)
+                                        if (isDark) Color(0xFFE2E5EC) else Color(0xFF555A64)
                                     }
                                     // 2. 考査：通常科目（紫色）
                                     isExamActive -> {
@@ -338,15 +338,21 @@ fun TimetableTable(
                                     isChangedActive -> {
                                         if (isSubjectColorEnabled && viewMode == TimetableViewMode.TIMETABLE && periodSchedule.subject.isNotBlank()) {
                                             val colorLong = SubjectColorDefaults.getColorForSubject(periodSchedule.subject, subjectColorGroups)
-                                            Color(colorLong)
+                                            val baseColor = Color(colorLong)
+                                            if (isDark && baseColor.luminance() < 0.35f) Color(0xFFCFD5E2) else baseColor
                                         } else {
                                             if (isDark) Color(0xFFFFD54F) else Color(0xFFBF360C)
                                         }
                                     }
-                                    // 4. 教科色分け有効時
+                                    // 4. 教科色分け有効時（ダークモードで明度が低すぎる未選択・その他等の色は明度を高めて見やすく調整）
                                     viewMode == TimetableViewMode.TIMETABLE && isSubjectColorEnabled && periodSchedule.subject.isNotBlank() -> {
                                         val colorLong = SubjectColorDefaults.getColorForSubject(periodSchedule.subject, subjectColorGroups)
-                                        Color(colorLong)
+                                        val baseColor = Color(colorLong)
+                                        if (isDark) {
+                                            if (baseColor.luminance() < 0.35f) Color(0xFFCFD5E2) else baseColor
+                                        } else {
+                                            if (baseColor.luminance() > 0.85f) Color(0xFF555A64) else baseColor
+                                        }
                                     }
                                     // 5. 通常文字色
                                     else -> {
@@ -355,7 +361,7 @@ fun TimetableTable(
                                 }
 
                                 val examTimeTextColor = when {
-                                    isUnselectedActive -> if (isDark) Color(0xFF757575) else Color(0xFF9E9E9E)
+                                    isUnselectedActive -> if (isDark) Color(0xFFB0B6C4) else Color(0xFF757A88)
                                     isDark -> Color(0xFFD1C4E9)
                                     else -> Color(0xFF5E35B1)
                                 }
@@ -381,7 +387,7 @@ fun TimetableTable(
                                 val finalFontSize = (targetSp - colScale - charLengthPenalty).coerceAtLeast(8.5f).sp
 
                                 val cellBorder = when {
-                                    isUnselectedActive -> BorderStroke(1.dp, if (isDark) Color(0xFF616161) else Color(0xFFBDBDBD))
+                                    isUnselectedActive -> BorderStroke(1.dp, if (isDark) Color(0xFF707786) else Color(0xFFB4BAC7))
                                     isExamActive -> BorderStroke(1.5.dp, if (isDark) Color(0xFFCE93D8) else Color(0xFF7E57C2))
                                     isChangedActive -> BorderStroke(1.5.dp, if (isDark) Color(0xFFFFB74D) else Color(0xFFFF8F00))
                                     isSelectedCol -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))

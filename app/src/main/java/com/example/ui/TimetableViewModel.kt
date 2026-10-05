@@ -493,37 +493,83 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun jumpToSearchResult(date: LocalDate) {
+        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+        val currentBase = _uiState.value.baseViewDate
+        val newBase = if (date.isBefore(currentBase) || !date.isBefore(currentBase.plusDays(totalVisibleDays.toLong()))) {
+            date
+        } else {
+            currentBase
+        }
         _uiState.update {
             it.copy(
-                baseViewDate = date,
+                baseViewDate = newBase,
                 selectedDate = date,
                 showSearchDialog = false
             )
         }
+        loadSelectedDateEventAndMemo(date)
         refreshSchedules()
     }
 
     fun goToPreviousDay() {
-        val newDate = _uiState.value.baseViewDate.minusDays(1)
-        _uiState.update {
-            it.copy(baseViewDate = newDate, selectedDate = newDate)
+        val currentSelected = _uiState.value.selectedDate
+        val newSelectedDate = currentSelected.minusDays(1)
+        val currentBase = _uiState.value.baseViewDate
+        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+
+        // 表示中テーブルの範囲外になった場合のみ baseViewDate を移動
+        val newBase = when {
+            newSelectedDate.isBefore(currentBase) -> newSelectedDate
+            !newSelectedDate.isBefore(currentBase.plusDays(totalVisibleDays.toLong())) -> {
+                newSelectedDate.minusDays(totalVisibleDays.toLong() - 1)
+            }
+            else -> currentBase
         }
+
+        _uiState.update {
+            it.copy(baseViewDate = newBase, selectedDate = newSelectedDate)
+        }
+        loadSelectedDateEventAndMemo(newSelectedDate)
         refreshSchedules()
     }
 
     fun resetToToday() {
         val today = _uiState.value.currentDate
-        _uiState.update {
-            it.copy(baseViewDate = today, selectedDate = today)
+        val currentBase = _uiState.value.baseViewDate
+        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+
+        val newBase = if (today.isBefore(currentBase) || !today.isBefore(currentBase.plusDays(totalVisibleDays.toLong()))) {
+            today
+        } else {
+            currentBase
         }
+
+        _uiState.update {
+            it.copy(baseViewDate = newBase, selectedDate = today)
+        }
+        loadSelectedDateEventAndMemo(today)
         refreshSchedules()
     }
 
     fun goToNextDay() {
-        val newDate = _uiState.value.baseViewDate.plusDays(1)
-        _uiState.update {
-            it.copy(baseViewDate = newDate, selectedDate = newDate)
+        val currentSelected = _uiState.value.selectedDate
+        val newSelectedDate = currentSelected.plusDays(1)
+        val currentBase = _uiState.value.baseViewDate
+        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+
+        // 表示中テーブルの右端を超えた場合のみ baseViewDate を移動して右端に収める
+        val newBase = when {
+            !newSelectedDate.isBefore(currentBase.plusDays(totalVisibleDays.toLong())) -> {
+                newSelectedDate.minusDays(totalVisibleDays.toLong() - 1)
+            }
+            newSelectedDate.isBefore(currentBase) -> newSelectedDate
+            else -> currentBase
         }
+
+        _uiState.update {
+            it.copy(baseViewDate = newBase, selectedDate = newSelectedDate)
+        }
+        loadSelectedDateEventAndMemo(newSelectedDate)
         refreshSchedules()
     }
 
@@ -534,6 +580,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             val validDay = day.coerceIn(1, maxDayInMonth)
             val newDate = LocalDate.of(currentYear, month, validDay)
             _uiState.update { it.copy(baseViewDate = newDate, selectedDate = newDate) }
+            loadSelectedDateEventAndMemo(newDate)
             refreshSchedules()
         } catch (e: Exception) {
             // ignore invalid date

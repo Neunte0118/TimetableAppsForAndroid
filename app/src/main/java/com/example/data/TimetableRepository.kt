@@ -97,14 +97,13 @@ class TimetableRepository(private val context: Context) {
     }
 
     private fun loadSubjectColorGroups(): List<SubjectColorGroup> {
-        // v2キー、またはenglishが含まれている完全な設定かを判定
         val version = prefs.getInt("subject_color_groups_version", 0)
         val jsonStr = prefs.getString("subject_color_groups_json", null)
-        if (version < 2 || jsonStr.isNullOrBlank()) {
-            // 新しいデフォルトグループを保存して反映
+        if (version < 3 || jsonStr.isNullOrBlank()) {
+            // 新しいデフォルトグループ（未選択・その他の明度向上）を保存して反映
             val defaults = SubjectColorDefaults.defaultGroups
             persistSubjectColorGroups(defaults)
-            prefs.edit().putInt("subject_color_groups_version", 2).apply()
+            prefs.edit().putInt("subject_color_groups_version", 3).apply()
             return defaults
         }
         return try {
@@ -115,8 +114,12 @@ class TimetableRepository(private val context: Context) {
                 val id = obj.optString("id", java.util.UUID.randomUUID().toString())
                 val name = obj.optString("name", "グループ")
                 val hue = obj.optDouble("hue", 0.0).toFloat()
-                val sat = obj.optDouble("saturation", 0.8).toFloat()
-                val value = obj.optDouble("value", 0.85).toFloat()
+                var sat = obj.optDouble("saturation", 0.8).toFloat()
+                var value = obj.optDouble("value", 0.85).toFloat()
+                if (id == "elective_course" && value < 0.6f) {
+                    value = 0.82f
+                    sat = 0.08f
+                }
                 val subjectsArr = obj.optJSONArray("subjects")
                 val subjects = mutableListOf<String>()
                 if (subjectsArr != null) {
@@ -126,11 +129,11 @@ class TimetableRepository(private val context: Context) {
                 }
                 list.add(SubjectColorGroup(id, name, hue, sat, value, subjects))
             }
-            // 古い7グループなどの不完全な設定の場合は最新デフォルトに更新
+            // 古い不完全な設定の場合は最新デフォルトに更新
             if (list.isEmpty() || list.size < 10 || list.none { it.id == "english" }) {
                 val defaults = SubjectColorDefaults.defaultGroups
                 persistSubjectColorGroups(defaults)
-                prefs.edit().putInt("subject_color_groups_version", 2).apply()
+                prefs.edit().putInt("subject_color_groups_version", 3).apply()
                 defaults
             } else {
                 list
@@ -138,7 +141,7 @@ class TimetableRepository(private val context: Context) {
         } catch (_: Exception) {
             val defaults = SubjectColorDefaults.defaultGroups
             persistSubjectColorGroups(defaults)
-            prefs.edit().putInt("subject_color_groups_version", 2).apply()
+            prefs.edit().putInt("subject_color_groups_version", 3).apply()
             defaults
         }
     }
