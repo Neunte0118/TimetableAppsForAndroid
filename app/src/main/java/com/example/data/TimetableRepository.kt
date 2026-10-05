@@ -480,7 +480,12 @@ class TimetableRepository(private val context: Context) {
         EventMemoWidgetProvider.updateAllWidgets(context)
     }
 
-    fun getDaySchedule(classGroup: ClassGroup, date: LocalDate, baseDate: LocalDate): DaySchedule {
+    fun getDaySchedule(
+        classGroup: ClassGroup,
+        date: LocalDate,
+        baseDate: LocalDate,
+        userElectives: Map<String, String> = getElectiveSelectionsForClass(classGroup.id)
+    ): DaySchedule {
         val daysDiff = java.time.temporal.ChronoUnit.DAYS.between(baseDate, date)
         val relativeLabel = when (daysDiff) {
             0L -> "今日"
@@ -503,9 +508,6 @@ class TimetableRepository(private val context: Context) {
         // Memo (User notes)
         val savedMemo = prefs.getString(getMemoKey(classGroup.id, date), null)
         val memo = savedMemo ?: ""
-
-        // User electives for this class
-        val userElectives = getElectiveSelectionsForClass(classGroup.id)
 
         // Periods dynamically generated from CSV data (1..5 or 6, 7 if special/exam schedule)
         val maxPeriods = csvSyncManager.getMaxPeriodsForDate(date)

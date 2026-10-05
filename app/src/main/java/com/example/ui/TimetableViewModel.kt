@@ -12,6 +12,8 @@ import com.example.data.csv.CsvUrlsConfig
 import com.example.data.csv.UpdateHistoryRow
 import com.example.model.*
 import com.example.notification.NotificationHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,6 +21,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 
 enum class OnboardingStep {
     NONE,
@@ -110,6 +113,8 @@ data class TimetableUiState(
 class TimetableViewModel(application: Application) : AndroidViewModel(application) {
     val repository = TimetableRepository.getInstance(application)
     private val sharedPrefs = application.getSharedPreferences("timetable_settings", Context.MODE_PRIVATE)
+    private val scheduleRefreshVersion = AtomicLong(0)
+    private var scheduleRefreshJob: Job? = null
 
     private val isSystemDarkTheme: Boolean =
         (application.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -910,38 +915,44 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         val selectedClass = state.selectedClass
         val columns = state.columnCount
         val tableCount = state.tableDisplayCount.coerceIn(1, 3)
+        val requestedVersion = scheduleRefreshVersion.incrementAndGet()
 
-        // 過去ブロック: baseDate の直前 columns 日間 (-columns .. -1)
-        val pastBlock = (columns downTo 1).map { offset ->
-            val targetDate = base.minusDays(offset.toLong())
-            repository.getDaySchedule(selectedClass, targetDate, today)
-        }
-
-        // 現在ブロック: baseDate から columns 日間 (0 .. columns - 1)
-        val currentBlock = (0 until columns).map { offset ->
-            val targetDate = base.plusDays(offset.toLong())
-            repository.getDaySchedule(selectedClass, targetDate, today)
-        }
-
-        // 複数テーブル表示用のブロックリスト (tableCount 個)
-        val displayBlocks = (0 until tableCount).map { tableIndex ->
-            val startOffset = tableIndex * columns
-            (0 until columns).map { colOffset ->
-                val targetDate = base.plusDays((startOffset + colOffset).toLong())
-                repository.getDaySchedule(selectedClass, targetDate, today)
+        // 日付移動のタップ処理を止めないため、CSV の照合と時間割生成はメインスレッドで行わない。
+        // 新しい要求が来た場合は古い結果を画面へ反映しない。
+        scheduleRefreshJob?.cancel()
+        scheduleRefreshJob = viewModelScope.launch(Dispatchers.Default) {
+            val schedulesByDate = mutableMapOf<LocalDate, DaySchedule>()
+            val userElectives = repository.getElectiveSelectionsForClass(selectedClass.id)
+            fun scheduleFor(date: LocalDate): DaySchedule = schedulesByDate.getOrPut(date) {
+                repository.getDaySchedule(selectedClass, date, today, userElectives)
             }
-        }
 
-        val selectedSched = repository.getDaySchedule(selectedClass, state.selectedDate, today)
+            // 過去ブロック: baseDate の直前 columns 日間 (-columns .. -1)
+            val pastBlock = (columns downTo 1).map { offset ->
+                scheduleFor(base.minusDays(offset.toLong()))
+            }
 
-        _uiState.update {
-            it.copy(
-                pastBlockSchedules = pastBlock,
-                currentBlockSchedules = currentBlock,
-                displayBlockSchedulesList = displayBlocks,
-                selectedDateEvent = selectedSched.event,
-                selectedDateMemo = selectedSched.memo
-            )
+            // 複数テーブル表示用のブロックリスト (tableCount 個)
+            val displayBlocks = (0 until tableCount).map { tableIndex ->
+                val startOffset = tableIndex * columns
+                (0 until columns).map { colOffset ->
+                    scheduleFor(base.plusDays((startOffset + colOffset).toLong()))
+                }
+            }
+            val currentBlock = displayBlocks.first()
+            val selectedSched = scheduleFor(state.selectedDate)
+
+            if (scheduleRefreshVersion.get() == requestedVersion) {
+                _uiState.update {
+                    it.copy(
+                        pastBlockSchedules = pastBlock,
+                        currentBlockSchedules = currentBlock,
+                        displayBlockSchedulesList = displayBlocks,
+                        selectedDateEvent = selectedSched.event,
+                        selectedDateMemo = selectedSched.memo
+                    )
+                }
+            }
         }
     }
 }
