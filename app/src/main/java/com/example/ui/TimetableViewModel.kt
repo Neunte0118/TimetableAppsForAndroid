@@ -40,8 +40,8 @@ data class TimetableUiState(
     val liveTimeString: String = "",
     val viewMode: TimetableViewMode = TimetableViewMode.TIMETABLE,
     val cellColorMode: CellColorMode = CellColorMode.UNIFORM,
-    // 教科テキスト色分け設定 (グループHSV対応, デフォルトOFF)
-    val isSubjectColorEnabled: Boolean = false,
+    // 教科テキスト色分け設定 (グループHSV対応, デフォルトON)
+    val isSubjectColorEnabled: Boolean = true,
     val subjectColorGroups: List<SubjectColorGroup> = SubjectColorDefaults.defaultGroups,
     // 後方互換
     val subjectColors: Map<String, Long> = SubjectColorDefaults.defaultSubjectColors,

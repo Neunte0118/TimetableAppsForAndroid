@@ -87,7 +87,7 @@ class TimetableRepository(private val context: Context) {
     }
 
     private fun loadSubjectColorEnabled(): Boolean {
-        return prefs.getBoolean("subject_color_text_enabled", false)
+        return prefs.getBoolean("subject_color_text_enabled", true)
     }
 
     fun setSubjectColorEnabled(enabled: Boolean) {

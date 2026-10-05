@@ -44,7 +44,7 @@ fun TimetableTable(
     today: LocalDate,
     viewMode: TimetableViewMode,
     cellColorMode: CellColorMode = CellColorMode.UNIFORM,
-    isSubjectColorEnabled: Boolean = false,
+    isSubjectColorEnabled: Boolean = true,
     subjectColorGroups: List<SubjectColorGroup> = SubjectColorDefaults.defaultGroups,
     subjectColors: Map<String, Long> = emptyMap(),
     isHighlightChangedPeriods: Boolean = true,

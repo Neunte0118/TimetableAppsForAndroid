@@ -769,7 +769,7 @@ fun SubjectColorsDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("教科テキストの色分け", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
-                                "グループごとにHSVで決めた色で時間割の文字を表示します（初期値: オフ）",
+                                "グループごとにHSVで決めた色で時間割の文字を表示します（初期値: オン）",
                                 fontSize = 11.5.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -3455,7 +3455,7 @@ fun OtherMenuModalSheet(
                 icon = Icons.Outlined.Palette,
                 iconTint = colorDisplay,
                 title = "教科の色分け",
-                subtitle = if (isSubjectColorEnabled) "有効" else "無効 (標準)",
+                subtitle = if (isSubjectColorEnabled) "有効 (標準)" else "無効",
                 onClick = onOpenSubjectColors,
                 testTag = "menu_subject_colors"
             )
