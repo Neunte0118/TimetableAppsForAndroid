@@ -113,8 +113,6 @@ data class TimetableUiState(
 class TimetableViewModel(application: Application) : AndroidViewModel(application) {
     val repository = TimetableRepository.getInstance(application)
     private val sharedPrefs = application.getSharedPreferences("timetable_settings", Context.MODE_PRIVATE)
-    private val scheduleRefreshVersion = AtomicLong(0)
-    private var scheduleRefreshJob: Job? = null
 
     private val isSystemDarkTheme: Boolean =
         (application.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -493,96 +491,145 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun jumpToSearchResult(date: LocalDate) {
-        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
-        val currentBase = _uiState.value.baseViewDate
+        val state = _uiState.value
+        val totalVisibleDays = state.columnCount * state.tableDisplayCount.coerceIn(1, 3)
+        val currentBase = state.baseViewDate
         val newBase = if (date.isBefore(currentBase) || !date.isBefore(currentBase.plusDays(totalVisibleDays.toLong()))) {
             date
         } else {
             currentBase
         }
+        val bundle = computeSchedules(
+            base = newBase,
+            selectedDate = date,
+            selectedClass = state.selectedClass,
+            today = state.currentDate,
+            columns = state.columnCount,
+            tableCount = state.tableDisplayCount.coerceIn(1, 3)
+        )
         _uiState.update {
             it.copy(
                 baseViewDate = newBase,
                 selectedDate = date,
-                showSearchDialog = false
+                showSearchDialog = false,
+                pastBlockSchedules = bundle.pastBlock,
+                currentBlockSchedules = bundle.currentBlock,
+                displayBlockSchedulesList = bundle.displayBlocks,
+                selectedDateEvent = bundle.selectedEvent,
+                selectedDateMemo = bundle.selectedMemo
             )
         }
-        loadSelectedDateEventAndMemo(date)
-        refreshSchedules()
     }
 
     fun goToPreviousDay() {
-        val currentSelected = _uiState.value.selectedDate
-        val newSelectedDate = currentSelected.minusDays(1)
-        val currentBase = _uiState.value.baseViewDate
-        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+        val state = _uiState.value
+        val currentBase = state.baseViewDate
+        val newDate = currentBase.minusDays(1)
 
-        // 表示中テーブルの範囲外になった場合のみ baseViewDate を移動
-        val newBase = when {
-            newSelectedDate.isBefore(currentBase) -> newSelectedDate
-            !newSelectedDate.isBefore(currentBase.plusDays(totalVisibleDays.toLong())) -> {
-                newSelectedDate.minusDays(totalVisibleDays.toLong() - 1)
-            }
-            else -> currentBase
-        }
+        val bundle = computeSchedules(
+            base = newDate,
+            selectedDate = newDate,
+            selectedClass = state.selectedClass,
+            today = state.currentDate,
+            columns = state.columnCount,
+            tableCount = state.tableDisplayCount.coerceIn(1, 3)
+        )
 
         _uiState.update {
-            it.copy(baseViewDate = newBase, selectedDate = newSelectedDate)
+            it.copy(
+                baseViewDate = newDate,
+                selectedDate = newDate,
+                pastBlockSchedules = bundle.pastBlock,
+                currentBlockSchedules = bundle.currentBlock,
+                displayBlockSchedulesList = bundle.displayBlocks,
+                selectedDateEvent = bundle.selectedEvent,
+                selectedDateMemo = bundle.selectedMemo
+            )
         }
-        loadSelectedDateEventAndMemo(newSelectedDate)
-        refreshSchedules()
     }
 
     fun resetToToday() {
-        val today = _uiState.value.currentDate
-        val currentBase = _uiState.value.baseViewDate
-        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+        val state = _uiState.value
+        val today = state.currentDate
+        val newBase = today
+        val newSelected = today
 
-        val newBase = if (today.isBefore(currentBase) || !today.isBefore(currentBase.plusDays(totalVisibleDays.toLong()))) {
-            today
-        } else {
-            currentBase
-        }
+        val bundle = computeSchedules(
+            base = newBase,
+            selectedDate = newSelected,
+            selectedClass = state.selectedClass,
+            today = today,
+            columns = state.columnCount,
+            tableCount = state.tableDisplayCount.coerceIn(1, 3)
+        )
 
         _uiState.update {
-            it.copy(baseViewDate = newBase, selectedDate = today)
+            it.copy(
+                baseViewDate = newBase,
+                selectedDate = newSelected,
+                pastBlockSchedules = bundle.pastBlock,
+                currentBlockSchedules = bundle.currentBlock,
+                displayBlockSchedulesList = bundle.displayBlocks,
+                selectedDateEvent = bundle.selectedEvent,
+                selectedDateMemo = bundle.selectedMemo
+            )
         }
-        loadSelectedDateEventAndMemo(today)
-        refreshSchedules()
     }
 
     fun goToNextDay() {
-        val currentSelected = _uiState.value.selectedDate
-        val newSelectedDate = currentSelected.plusDays(1)
-        val currentBase = _uiState.value.baseViewDate
-        val totalVisibleDays = _uiState.value.columnCount * _uiState.value.tableDisplayCount.coerceIn(1, 3)
+        val state = _uiState.value
+        val currentBase = state.baseViewDate
+        val newDate = currentBase.plusDays(1)
 
-        // 表示中テーブルの右端を超えた場合のみ baseViewDate を移動して右端に収める
-        val newBase = when {
-            !newSelectedDate.isBefore(currentBase.plusDays(totalVisibleDays.toLong())) -> {
-                newSelectedDate.minusDays(totalVisibleDays.toLong() - 1)
-            }
-            newSelectedDate.isBefore(currentBase) -> newSelectedDate
-            else -> currentBase
-        }
+        val bundle = computeSchedules(
+            base = newDate,
+            selectedDate = newDate,
+            selectedClass = state.selectedClass,
+            today = state.currentDate,
+            columns = state.columnCount,
+            tableCount = state.tableDisplayCount.coerceIn(1, 3)
+        )
 
         _uiState.update {
-            it.copy(baseViewDate = newBase, selectedDate = newSelectedDate)
+            it.copy(
+                baseViewDate = newDate,
+                selectedDate = newDate,
+                pastBlockSchedules = bundle.pastBlock,
+                currentBlockSchedules = bundle.currentBlock,
+                displayBlockSchedulesList = bundle.displayBlocks,
+                selectedDateEvent = bundle.selectedEvent,
+                selectedDateMemo = bundle.selectedMemo
+            )
         }
-        loadSelectedDateEventAndMemo(newSelectedDate)
-        refreshSchedules()
     }
 
     fun jumpToDate(month: Int, day: Int) {
-        val currentYear = _uiState.value.currentDate.year
+        val state = _uiState.value
+        val currentYear = state.currentDate.year
         try {
             val maxDayInMonth = java.time.YearMonth.of(currentYear, month).lengthOfMonth()
             val validDay = day.coerceIn(1, maxDayInMonth)
             val newDate = LocalDate.of(currentYear, month, validDay)
-            _uiState.update { it.copy(baseViewDate = newDate, selectedDate = newDate) }
-            loadSelectedDateEventAndMemo(newDate)
-            refreshSchedules()
-        } catch (e: Exception) {
+            val bundle = computeSchedules(
+                base = newDate,
+                selectedDate = newDate,
+                selectedClass = state.selectedClass,
+                today = state.currentDate,
+                columns = state.columnCount,
+                tableCount = state.tableDisplayCount.coerceIn(1, 3)
+            )
+            _uiState.update {
+                it.copy(
+                    baseViewDate = newDate,
+                    selectedDate = newDate,
+                    pastBlockSchedules = bundle.pastBlock,
+                    currentBlockSchedules = bundle.currentBlock,
+                    displayBlockSchedulesList = bundle.displayBlocks,
+                    selectedDateEvent = bundle.selectedEvent,
+                    selectedDateMemo = bundle.selectedMemo
+                )
+            }
+        } catch (_: Exception) {
             // ignore invalid date
         }
     }
@@ -955,51 +1002,70 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private data class ScheduleBundle(
+        val pastBlock: List<DaySchedule>,
+        val currentBlock: List<DaySchedule>,
+        val displayBlocks: List<List<DaySchedule>>,
+        val selectedEvent: String,
+        val selectedMemo: String
+    )
+
+    private fun computeSchedules(
+        base: LocalDate,
+        selectedDate: LocalDate,
+        selectedClass: ClassGroup,
+        today: LocalDate,
+        columns: Int,
+        tableCount: Int
+    ): ScheduleBundle {
+        val schedulesByDate = mutableMapOf<LocalDate, DaySchedule>()
+        val userElectives = repository.getElectiveSelectionsForClass(selectedClass.id)
+        fun scheduleFor(date: LocalDate): DaySchedule = schedulesByDate.getOrPut(date) {
+            repository.getDaySchedule(selectedClass, date, today, userElectives)
+        }
+
+        // 過去ブロック: baseDate の直前 columns 日間 (-columns .. -1)
+        val pastBlock = (columns downTo 1).map { offset ->
+            scheduleFor(base.minusDays(offset.toLong()))
+        }
+
+        // 複数テーブル表示用のブロックリスト (tableCount 個)
+        val displayBlocks = (0 until tableCount).map { tableIndex ->
+            val startOffset = tableIndex * columns
+            (0 until columns).map { colOffset ->
+                scheduleFor(base.plusDays((startOffset + colOffset).toLong()))
+            }
+        }
+        val currentBlock = displayBlocks.firstOrNull() ?: emptyList()
+        val selectedSched = scheduleFor(selectedDate)
+
+        return ScheduleBundle(
+            pastBlock = pastBlock,
+            currentBlock = currentBlock,
+            displayBlocks = displayBlocks,
+            selectedEvent = selectedSched.event,
+            selectedMemo = selectedSched.memo
+        )
+    }
+
     private fun refreshSchedules() {
         val state = _uiState.value
-        val base = state.baseViewDate
-        val today = state.currentDate
-        val selectedClass = state.selectedClass
-        val columns = state.columnCount
-        val tableCount = state.tableDisplayCount.coerceIn(1, 3)
-        val requestedVersion = scheduleRefreshVersion.incrementAndGet()
-
-        // 日付移動のタップ処理を止めないため、CSV の照合と時間割生成はメインスレッドで行わない。
-        // 新しい要求が来た場合は古い結果を画面へ反映しない。
-        scheduleRefreshJob?.cancel()
-        scheduleRefreshJob = viewModelScope.launch(Dispatchers.Default) {
-            val schedulesByDate = mutableMapOf<LocalDate, DaySchedule>()
-            val userElectives = repository.getElectiveSelectionsForClass(selectedClass.id)
-            fun scheduleFor(date: LocalDate): DaySchedule = schedulesByDate.getOrPut(date) {
-                repository.getDaySchedule(selectedClass, date, today, userElectives)
-            }
-
-            // 過去ブロック: baseDate の直前 columns 日間 (-columns .. -1)
-            val pastBlock = (columns downTo 1).map { offset ->
-                scheduleFor(base.minusDays(offset.toLong()))
-            }
-
-            // 複数テーブル表示用のブロックリスト (tableCount 個)
-            val displayBlocks = (0 until tableCount).map { tableIndex ->
-                val startOffset = tableIndex * columns
-                (0 until columns).map { colOffset ->
-                    scheduleFor(base.plusDays((startOffset + colOffset).toLong()))
-                }
-            }
-            val currentBlock = displayBlocks.first()
-            val selectedSched = scheduleFor(state.selectedDate)
-
-            if (scheduleRefreshVersion.get() == requestedVersion) {
-                _uiState.update {
-                    it.copy(
-                        pastBlockSchedules = pastBlock,
-                        currentBlockSchedules = currentBlock,
-                        displayBlockSchedulesList = displayBlocks,
-                        selectedDateEvent = selectedSched.event,
-                        selectedDateMemo = selectedSched.memo
-                    )
-                }
-            }
+        val bundle = computeSchedules(
+            base = state.baseViewDate,
+            selectedDate = state.selectedDate,
+            selectedClass = state.selectedClass,
+            today = state.currentDate,
+            columns = state.columnCount,
+            tableCount = state.tableDisplayCount.coerceIn(1, 3)
+        )
+        _uiState.update {
+            it.copy(
+                pastBlockSchedules = bundle.pastBlock,
+                currentBlockSchedules = bundle.currentBlock,
+                displayBlockSchedulesList = bundle.displayBlocks,
+                selectedDateEvent = bundle.selectedEvent,
+                selectedDateMemo = bundle.selectedMemo
+            )
         }
     }
 }

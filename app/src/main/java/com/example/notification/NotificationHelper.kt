@@ -297,9 +297,10 @@ object NotificationHelper {
             return false
         }
 
-        val timeLabel = if (periodSchedule?.startTime?.isNotBlank() == true) " (${periodSchedule.startTime}〜)" else ""
+        val rawRoom = periodSchedule?.classroom?.trim().orEmpty()
+        val room = if (rawRoom.isNotBlank()) rawRoom else "${selectedClass.name}教室"
         val title = "次は ${subject} です。"
-        val detailText = "${period} 限の科目は ${subject} です。$timeLabel"
+        val detailText = "${period} の授業は、 ${room} で、 ${subject} です。"
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

@@ -60,6 +60,9 @@ object CsvNormalizer {
         return sb.toString()
     }
 
+    private val WHITESPACE_REGEX = Regex("""\s+""")
+    private val subjectCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /**
      * 科目名の正規化パイプライン。
      * - 英数字・記号の半角化（例: 化Ｓ① -> 化S①, 物理Ｌ -> 物理L）
@@ -69,11 +72,14 @@ object CsvNormalizer {
     fun normalizeSubject(subject: String): String {
         val trimmed = subject.trim()
         if (trimmed.isEmpty()) return ""
+        val cached = subjectCache[trimmed]
+        if (cached != null) return cached
 
         var s = normalizeAlphanumeric(trimmed)
         // 連続空白を1つに集約
-        s = s.replace(Regex("""\s+"""), " ").trim()
+        s = s.replace(WHITESPACE_REGEX, " ").trim()
 
+        subjectCache[trimmed] = s
         return s
     }
 

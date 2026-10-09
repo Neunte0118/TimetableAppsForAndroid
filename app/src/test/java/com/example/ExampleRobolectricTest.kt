@@ -283,5 +283,34 @@ class ExampleRobolectricTest {
     assertEquals("英語W", pEigoW.subject)
     assertTrue("EigoW is not unselected", !pEigoW.isUnselectedElective)
   }
+
+  @Test
+  fun `verify date navigation advances and retreats baseViewDate and selectedDate`() {
+    val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+    val viewModel = com.example.ui.TimetableViewModel(application)
+
+    val initialBase = viewModel.uiState.value.baseViewDate
+    val initialSelected = viewModel.uiState.value.selectedDate
+
+    // 1. Move to Next Day: both baseViewDate and selectedDate move forward by 1 day
+    viewModel.goToNextDay()
+    val nextBase = viewModel.uiState.value.baseViewDate
+    val nextSelected = viewModel.uiState.value.selectedDate
+
+    assertEquals(initialBase.plusDays(1), nextBase)
+    assertEquals(initialSelected.plusDays(1), nextSelected)
+    val firstDisplayedDate = viewModel.uiState.value.displayBlockSchedulesList.first().first().date
+    assertEquals(nextBase, firstDisplayedDate)
+
+    // 2. Move to Previous Day: both baseViewDate and selectedDate move backward by 1 day
+    viewModel.goToPreviousDay()
+    val prevBase = viewModel.uiState.value.baseViewDate
+    val prevSelected = viewModel.uiState.value.selectedDate
+
+    assertEquals(initialBase, prevBase)
+    assertEquals(initialSelected, prevSelected)
+    val prevFirstDisplayedDate = viewModel.uiState.value.displayBlockSchedulesList.first().first().date
+    assertEquals(prevBase, prevFirstDisplayedDate)
+  }
 }
 

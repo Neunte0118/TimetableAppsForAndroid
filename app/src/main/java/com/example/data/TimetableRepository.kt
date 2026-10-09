@@ -74,6 +74,13 @@ class TimetableRepository(private val context: Context) {
     private val _nextClassLeadMinutes = MutableStateFlow(loadNextClassLeadMinutes())
     val nextClassLeadMinutes: StateFlow<Int> = _nextClassLeadMinutes.asStateFlow()
 
+    // In-memory cache for DaySchedule to enable instant date switching (<1ms)
+    private val dayScheduleCache = java.util.concurrent.ConcurrentHashMap<String, DaySchedule>()
+
+    fun clearScheduleCache() {
+        dayScheduleCache.clear()
+    }
+
     val csvUrlsConfig: StateFlow<CsvUrlsConfig> = csvSyncManager.urlsConfig
     val csvSyncStatus: StateFlow<CsvSyncStatus> = csvSyncManager.syncStatus
 
@@ -368,13 +375,16 @@ class TimetableRepository(private val context: Context) {
     }
 
     suspend fun syncCsvData(): Result<String> {
+        clearScheduleCache()
         val res = csvSyncManager.syncAllCsvs()
+        clearScheduleCache()
         TimetableWidgetProvider.updateAllWidgets(context)
         EventMemoWidgetProvider.updateAllWidgets(context)
         return res
     }
 
     fun clearAllCsvCache() {
+        clearScheduleCache()
         csvSyncManager.clearAllCache()
     }
 
@@ -449,6 +459,7 @@ class TimetableRepository(private val context: Context) {
     }
 
     fun setSelectedClass(classGroup: ClassGroup) {
+        clearScheduleCache()
         prefs.edit()
             .putString("selected_class_id", classGroup.id)
             .putBoolean("has_selected_class", true)
@@ -479,6 +490,7 @@ class TimetableRepository(private val context: Context) {
 
     fun saveElectiveChoice(classId: String, origin: String, electiveChoice: String) {
         prefs.edit().putString("elective_${classId}_$origin", electiveChoice.trim()).apply()
+        clearScheduleCache()
         TimetableWidgetProvider.updateAllWidgets(context)
         EventMemoWidgetProvider.updateAllWidgets(context)
     }
@@ -505,6 +517,16 @@ class TimetableRepository(private val context: Context) {
             else -> if (daysDiff > 0) "${daysDiff}日後" else "${-daysDiff}日前"
         }
 
+        val cacheKey = "${classGroup.id}_${date}_${userElectives.hashCode()}"
+        val cached = dayScheduleCache[cacheKey]
+        if (cached != null) {
+            return if (cached.dayLabel == relativeLabel) {
+                cached
+            } else {
+                cached.copy(dayLabel = relativeLabel)
+            }
+        }
+
         // Event from CSV (Read only)
         val event = csvSyncManager.getEventForDate(date)
 
@@ -518,17 +540,20 @@ class TimetableRepository(private val context: Context) {
             csvSyncManager.resolvePeriodSchedule(classGroup, date, period, userElectives)
         }
 
-        return DaySchedule(
+        val daySchedule = DaySchedule(
             date = date,
             dayLabel = relativeLabel,
             periods = periods,
             event = event,
             memo = memo
         )
+        dayScheduleCache[cacheKey] = daySchedule
+        return daySchedule
     }
 
     fun saveMemo(classId: String, date: LocalDate, memoText: String) {
         prefs.edit().putString(getMemoKey(classId, date), memoText).apply()
+        clearScheduleCache()
         TimetableWidgetProvider.updateAllWidgets(context)
         EventMemoWidgetProvider.updateAllWidgets(context)
     }

@@ -16,18 +16,18 @@ enum class TimetableViewMode {
  * PASTEL: 優しいパステル調
  */
 enum class CellColorMode(val label: String, val description: String) {
-    UNIFORM("統一（シンプル・推奨）", "落ち着いた単一カラーで統一し、すっきり見やすく表示します"),
-    COLORFUL("教科別カラー", "国語・数学・英語・理科・社会などを色分けして表示します"),
-    PASTEL("パステルカラー", "柔らかく淡いトーンで色分けします")
+    UNIFORM("統一", "落ち着いた単一カラー"),
+    COLORFUL("教科別カラー", "色分けして表示"),
+    PASTEL("パステルカラー", "パステルカラーで色分けします")
 }
 
 /**
  * セルフォントサイズ設定
  */
 enum class TimetableFontSize(val label: String, val subjectSp: Float, val classroomSp: Float) {
-    SMALL("小（コンパクト）", 12f, 11f),
-    MEDIUM("標準（おすすめ）", 14f, 12.5f),
-    LARGE("大（見やすい）", 16f, 14f)
+    SMALL("小", 12f, 11f),
+    MEDIUM("標準", 14f, 12.5f),
+    LARGE("大", 16f, 14f)
 }
 
 data class ClassGroup(
@@ -139,8 +139,7 @@ object SubjectColorDefaults {
             subjects = listOf(
                 "国語", "現代文", "現文", "古典", "古講", "古典講読", "古典探求", "古典探究", "古探",
                 "現読①", "現読②", "現読③", "現読④", "現世読", "現代世界を読む",
-                "国語表現", "言文", "言語文化", "論国", "論理国語", "文国", "文学国語",
-                "現文or英長or英W"
+                "現世読①", "現世読②", "現世読③", "現世読④"
             )
         ),
         SubjectColorGroup(
@@ -220,10 +219,7 @@ object SubjectColorDefaults {
             saturation = 0.65f,
             value = 0.88f,
             subjects = listOf(
-                "HR", "LHR", "ホームルーム", "進路HR", "HR教室",
-                "体育", "体育共修", "体育別修", "保健", "保体",
-                "学問発見講座", "総合探究", "総探", "探究", "総合的な探究の時間",
-                "始業式等", "始業式", "終業式", "式典", "道徳", "情報"
+                "HR", "LHR", "進路HR", "体育", "体育共修", "体育別修", "保健", "保体", "情報"
             )
         ),
         SubjectColorGroup(
@@ -285,13 +281,13 @@ object SubjectColorDefaults {
         // 4. 科目キーワード・プレフィックス判定
         val keywordFound = groups.find { grp ->
             when (grp.id) {
-                "japanese" -> listOf("国語", "現代文", "現文", "古典", "古講", "現読", "言文", "論国", "文国").any { trimmed.contains(it) }
-                "english" -> listOf("英語", "英W", "英Wt", "英長", "IBA", "IbA", "ⅠbA", "コミ英", "論表").any { trimmed.contains(it, ignoreCase = true) }
-                "math" -> listOf("数学", "数講", "数特", "数演", "ⅡS", "ⅡL").any { trimmed.contains(it) }
+                "japanese" -> listOf("国語", "現代文", "現文", "古典", "古講", "現読", "現世読").any { trimmed.contains(it) }
+                "english" -> listOf("英語", "英W", "英Wt", "英長", "IBA").any { trimmed.contains(it, ignoreCase = true) }
+                "math" -> listOf("数学", "数講", "数特", "数演", "ⅡS", "ⅡL", "ⅡLa", "ⅡLb").any { trimmed.contains(it) }
                 "science" -> listOf("理科", "化学", "物理", "生物", "地学", "理演", "物L", "化L", "生L", "地L", "化S", "物S", "生S").any { trimmed.contains(it) }
                 "social" -> listOf("社会", "地理", "日本史", "世界史", "倫政", "地総", "歴総", "公共", "日特", "世特", "日講", "世講").any { trimmed.contains(it) }
                 "art" -> listOf("音楽", "美術", "書道", "音特", "美特", "書特").any { trimmed.contains(it) }
-                "pe_and_hr" -> listOf("体育", "HR", "LHR", "ホームルーム", "進路HR", "探究", "総探", "始業式", "終業式", "式典", "学問発見").any { trimmed.contains(it, ignoreCase = true) }
+                "pe_and_hr" -> listOf("体育", "HR", "LHR", "ホームルーム", "進路HR").any { trimmed.contains(it, ignoreCase = true) }
                 else -> false
             }
         }

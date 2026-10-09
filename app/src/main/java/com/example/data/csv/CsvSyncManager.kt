@@ -71,6 +71,27 @@ class CsvSyncManager(private val context: Context) {
     private var sourceToTargetMap: Map<String, String> = emptyMap()
     private var targetToSourcesMap: Map<String, Set<String>> = emptyMap()
 
+    // Pre-indexed fast-lookup maps for ultra-responsive navigation (O(1) access)
+    private var examSchedulesByDate: Map<Pair<Int, Int>, List<ExamScheduleRow>> = emptyMap()
+    private var specialSchedulesByDate: Map<Pair<Int, Int>, List<SpecialScheduleRow>> = emptyMap()
+    private var commonSchedulesByDate: Map<Pair<Int, Int>, CommonScheduleRow> = emptyMap()
+    private var timetableChangesByDate: Map<Pair<Int, Int>, List<TimetableChangeNotificationRow>> = emptyMap()
+    private var courseChangesByDate: Map<Pair<Int, Int>, List<CourseChangeNotificationRow>> = emptyMap()
+    private var eventsByDate: Map<Pair<Int, Int>, List<EventRow>> = emptyMap()
+    private var holidaysByDate: Map<Pair<Int, Int>, HolidayRow> = emptyMap()
+    private var distinctElectiveOrigins: List<String> = emptyList()
+
+    private fun rebuildIndexMaps() {
+        examSchedulesByDate = examSchedules.groupBy { it.month to it.day }
+        specialSchedulesByDate = specialSchedules.groupBy { it.month to it.day }
+        commonSchedulesByDate = commonSchedules.associateBy { it.month to it.day }
+        timetableChangesByDate = timetableChanges.groupBy { it.month to it.day }
+        courseChangesByDate = courseChanges.groupBy { it.month to it.day }
+        eventsByDate = events.groupBy { it.month to it.day }
+        holidaysByDate = holidays.associateBy { it.month to it.day }
+        distinctElectiveOrigins = electives.map { it.origin.trim() }.filter { it.isNotBlank() }.distinct()
+    }
+
     init {
         loadAndParseLocalData()
     }
@@ -221,6 +242,7 @@ class CsvSyncManager(private val context: Context) {
         examSchedules = CsvParser.parseExamSchedule(examScheduleCsv)
         updateSubjectMappings(CsvParser.parseSubjectMapping(subjectMappingCsv))
         specialSchedules = if (specialScheduleCsv.isNotBlank()) CsvParser.parseSpecialSchedule(specialScheduleCsv) else emptyList()
+        rebuildIndexMaps()
 
         _syncStatus.value = _syncStatus.value.copy(
             basicCount = basicClassSchedule.size,
@@ -240,8 +262,8 @@ class CsvSyncManager(private val context: Context) {
 
     fun updateSubjectMappings(list: List<SubjectMappingRow>) {
         subjectMappings = list
-        val sToT = mutableMapOf<String, String>()
-        val tToS = mutableMapOf<String, MutableSet<String>>()
+        val sToT = java.util.TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER)
+        val tToS = java.util.TreeMap<String, MutableSet<String>>(String.CASE_INSENSITIVE_ORDER)
         // デフォルトで「現世読」->「現代世界を読む」のマッピングを登録
         sToT["現世読"] = "現代世界を読む"
         tToS.getOrPut("現代世界を読む") { mutableSetOf() }.add("現世読")
@@ -533,6 +555,9 @@ class CsvSyncManager(private val context: Context) {
      * （※講座番号等の識別子は別科目として区別します）
      */
     fun isSubjectMatch(name1: String, name2: String): Boolean {
+        if (name1 == name2) return true
+        if (name1.equals(name2, ignoreCase = true)) return true
+
         val s1 = CsvNormalizer.normalizeSubject(name1)
         val s2 = CsvNormalizer.normalizeSubject(name2)
         if (s1.isEmpty() || s2.isEmpty()) return false
@@ -553,12 +578,10 @@ class CsvSyncManager(private val context: Context) {
 
         // 1) s1 が source で s2 が target
         val target1 = sourceToTargetMap[s1]
-            ?: sourceToTargetMap.entries.find { it.key.equals(s1, ignoreCase = true) }?.value
         if (target1 != null && target1.equals(s2, ignoreCase = true)) return true
 
         // 2) s2 が source で s1 が target
         val target2 = sourceToTargetMap[s2]
-            ?: sourceToTargetMap.entries.find { it.key.equals(s2, ignoreCase = true) }?.value
         if (target2 != null && target2.equals(s1, ignoreCase = true)) return true
 
         // 3) 両方が source であり同一の target を参照している場合 (例: ⅡLa① と ⅡLa②)
@@ -574,11 +597,9 @@ class CsvSyncManager(private val context: Context) {
 
         // 4) target から source 群への逆引き照合
         val sources1 = targetToSourcesMap[s1]
-            ?: targetToSourcesMap.entries.find { it.key.equals(s1, ignoreCase = true) }?.value
         if (sources1 != null && sources1.any { it.equals(s2, ignoreCase = true) }) return true
 
         val sources2 = targetToSourcesMap[s2]
-            ?: targetToSourcesMap.entries.find { it.key.equals(s2, ignoreCase = true) }?.value
         if (sources2 != null && sources2.any { it.equals(s1, ignoreCase = true) }) return true
 
         return false
@@ -724,13 +745,13 @@ class CsvSyncManager(private val context: Context) {
         val rawClassId = classGroup.id.replace("組", "").trim()
 
         // 0. Check 考査時間割 (Exam Schedule) - クラスに関係なく適用（全クラス対象）
-        val matchingExams = examSchedules.filter { exam ->
-            exam.month == month && exam.day == day && exam.period == period &&
+        val matchingExams = examSchedulesByDate[month to day]?.filter { exam ->
+            exam.period == period &&
             (exam.classId.isBlank() || exam.classId.trim() == "0" || exam.classId.trim() == "全" ||
              exam.classId.trim() == classGroup.id.trim() ||
              exam.classId.replace("組", "").trim() == rawClassId ||
              exam.classId.trim() == classGroup.section.trim())
-        }
+        } ?: emptyList()
 
         if (matchingExams.isNotEmpty()) {
             val userElectiveValues = userElectives.values.filter { it.isNotBlank() }
@@ -884,7 +905,7 @@ class CsvSyncManager(private val context: Context) {
         }
 
         // 0.8 Check 特別時程時間割 (Special Schedule: date, period, subject, start_time, end_time)
-        val specialRow = specialSchedules.find { it.month == month && it.day == day && it.period == period }
+        val specialRow = specialSchedulesByDate[month to day]?.find { it.period == period }
         var specialStartTime = ""
         var specialEndTime = ""
 
@@ -899,7 +920,7 @@ class CsvSyncManager(private val context: Context) {
             specialStartTime = specialRow.startTime
             specialEndTime = specialRow.endTime
         } else {
-            val commonRow = commonSchedules.find { it.month == month && it.day == day }
+            val commonRow = commonSchedulesByDate[month to day]
             val periodIndex = period - 1
             val rawCode = commonRow?.periodCodes?.getOrNull(periodIndex)?.trim() ?: ""
 
@@ -928,8 +949,8 @@ class CsvSyncManager(private val context: Context) {
         var isChangedByNotification = false
 
         // 2. Check 講座変更 (Course Change Notifications)
-        val matchingCourseChange = courseChanges.find { change ->
-            change.month == month && change.day == day && change.period == period &&
+        val matchingCourseChange = courseChangesByDate[month to day]?.find { change ->
+            change.period == period &&
             (change.previousCourse.isNotBlank() && (
                 resolvedSubject.trim().equals(change.previousCourse.trim(), ignoreCase = true) ||
                 currentSubject.trim().equals(change.previousCourse.trim(), ignoreCase = true) ||
@@ -947,13 +968,13 @@ class CsvSyncManager(private val context: Context) {
         }
 
         // 3. Check 時間割変更届 (Timetable Change Notifications)
-        val matchingTimetableChanges = timetableChanges.filter { change ->
-            change.month == month && change.day == day && change.period == period &&
+        val matchingTimetableChanges = timetableChangesByDate[month to day]?.filter { change ->
+            change.period == period &&
             (change.classId.trim() == "0" || change.classId.trim() == "全" ||
              change.classId.trim() == classGroup.id.trim() ||
              change.classId.replace("組", "").trim() == rawClassId ||
              change.classId.trim() == classGroup.section.trim())
-        }
+        } ?: emptyList()
 
         if (matchingTimetableChanges.isNotEmpty()) {
             val specificChange = matchingTimetableChanges.find { it.classId.trim() != "0" && it.classId.trim() != "全" }
@@ -972,9 +993,9 @@ class CsvSyncManager(private val context: Context) {
         val isCommon = isCommonSubject(resolvedSubject, currentOrigin) ||
             classroom.contains("組教室") || classroom == "HR教室" || classroom == "自教室"
 
-        // 選択科目のコマだが未選択（自分の選択科目が未指定）かどうかを判定
-        val isElectiveSlot = !isCommon && electives.any {
-            isSubjectMatch(it.origin, currentSubject) || (currentOrigin.isNotBlank() && isSubjectMatch(it.origin, currentOrigin))
+        // 選択科目のコマだが未選択（自分の選択科目が未指定）かどうかを判定（ユニークなorigin一覧で高速判定）
+        val isElectiveSlot = !isCommon && distinctElectiveOrigins.any { origin ->
+            isSubjectMatch(origin, currentSubject) || (currentOrigin.isNotBlank() && isSubjectMatch(origin, currentOrigin))
         }
         val isUserChosen = userElectives.values.any { isSubjectMatch(it, resolvedSubject) }
         val isUnselectedElective = isElectiveSlot && !isUserChosen
@@ -1068,18 +1089,23 @@ class CsvSyncManager(private val context: Context) {
         // If user has chosen one of the electives for this origin, return it.
         // If user has NOT chosen any elective, DO NOT arbitrarily fall back to the first elective;
         // return the original subject/code instead.
-        val matchingElectives = electives.filter {
-            isSubjectMatch(it.origin, s) || (o.isNotBlank() && isSubjectMatch(it.origin, o))
+        val hasMatchingOrigin = distinctElectiveOrigins.any {
+            isSubjectMatch(it, s) || (o.isNotBlank() && isSubjectMatch(it, o))
         }
-        if (matchingElectives.isNotEmpty()) {
-            val userSelected = matchingElectives.find { el ->
-                userElectives.values.any { isSubjectMatch(it, el.elective) }
+        if (hasMatchingOrigin) {
+            val matchingElectives = electives.filter {
+                isSubjectMatch(it.origin, s) || (o.isNotBlank() && isSubjectMatch(it.origin, o))
             }
-            if (userSelected != null) {
-                return userSelected.elective.trim()
+            if (matchingElectives.isNotEmpty()) {
+                val userSelected = matchingElectives.find { el ->
+                    userElectives.values.any { isSubjectMatch(it, el.elective) }
+                }
+                if (userSelected != null) {
+                    return userSelected.elective.trim()
+                }
+                // ユーザーが未選択の場合は勝手にフォールバックせず元のコード (s または o) をそのまま表示
+                return if (s.isNotBlank()) s else o
             }
-            // ユーザーが未選択の場合は勝手にフォールバックせず元のコード (s または o) をそのまま表示
-            return if (s.isNotBlank()) s else o
         }
 
         return if (s.isNotBlank()) s else o
@@ -1221,8 +1247,8 @@ class CsvSyncManager(private val context: Context) {
     fun getMaxPeriodsForDate(date: LocalDate): Int {
         val m = date.monthValue
         val d = date.dayOfMonth
-        val maxSpecial = specialSchedules.filter { it.month == m && it.day == d }.maxOfOrNull { it.period } ?: 5
-        val maxExam = examSchedules.filter { it.month == m && it.day == d }.maxOfOrNull { it.period } ?: 5
+        val maxSpecial = specialSchedulesByDate[m to d]?.maxOfOrNull { it.period } ?: 5
+        val maxExam = examSchedulesByDate[m to d]?.maxOfOrNull { it.period } ?: 5
         return maxOf(5, maxSpecial, maxExam)
     }
 
@@ -1239,22 +1265,27 @@ class CsvSyncManager(private val context: Context) {
     }
 
     fun isHoliday(date: LocalDate): Boolean {
-        return holidays.any { it.month == date.monthValue && it.day == date.dayOfMonth && it.holiday.isNotBlank() }
+        return holidaysByDate[date.monthValue to date.dayOfMonth]?.holiday?.isNotBlank() == true
     }
 
     fun getHolidayName(date: LocalDate): String? {
-        return holidays.find { it.month == date.monthValue && it.day == date.dayOfMonth && it.holiday.isNotBlank() }?.holiday
+        val h = holidaysByDate[date.monthValue to date.dayOfMonth]?.holiday
+        return if (!h.isNullOrBlank()) h else null
     }
 
     fun getEventForDate(date: LocalDate): String {
+        val m = date.monthValue
+        val d = date.dayOfMonth
         val eventList = mutableListOf<String>()
         val holidayName = getHolidayName(date)
         if (holidayName != null) {
             eventList.add("$holidayName (祝日)")
         }
 
-        val matchingEvents = events.filter { it.month == date.monthValue && it.day == date.dayOfMonth && it.event.isNotBlank() }
-        matchingEvents.forEach { eventList.add(it.event) }
+        val matchingEvents = eventsByDate[m to d]
+        if (!matchingEvents.isNullOrEmpty()) {
+            matchingEvents.forEach { if (it.event.isNotBlank()) eventList.add(it.event) }
+        }
 
         val combined = eventList.joinToString(" / ")
         return formatEventText(combined)
@@ -1319,16 +1350,19 @@ class CsvSyncManager(private val context: Context) {
     @androidx.annotation.VisibleForTesting
     fun setElectivesForTesting(list: List<ElectiveItemRow>) {
         this.electives = list
+        this.distinctElectiveOrigins = list.map { it.origin.trim() }.filter { it.isNotBlank() }.distinct()
     }
 
     @androidx.annotation.VisibleForTesting
     fun setExamScheduleForTesting(list: List<ExamScheduleRow>) {
         this.examSchedules = list
+        this.examSchedulesByDate = list.groupBy { it.month to it.day }
     }
 
     @androidx.annotation.VisibleForTesting
     fun setSpecialScheduleForTesting(list: List<SpecialScheduleRow>) {
         this.specialSchedules = list
+        this.specialSchedulesByDate = list.groupBy { it.month to it.day }
     }
 
     @androidx.annotation.VisibleForTesting
