@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.data.TimetableRepository
+import com.example.model.StandardPeriodTimes
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
@@ -289,7 +290,7 @@ object NotificationHelper {
         var subject = periodSchedule?.subject?.trim() ?: ""
 
         if (isTest && subject.isBlank()) {
-            subject = "数学"
+            subject = "null"
         }
 
         // 次の科目がない場合は通知しない
@@ -297,10 +298,20 @@ object NotificationHelper {
             return false
         }
 
+        // 開始時間：CSVの値を優先し、なければ標準時刻
+        val startTime = periodSchedule?.startTime?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: StandardPeriodTimes.getTimes(period)?.first
+
+        // 終了時間：CSVの値を優先し、なければ標準時刻
+        val endTime = periodSchedule?.endTime?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: StandardPeriodTimes.getTimes(period)?.second
+            
         val rawRoom = periodSchedule?.classroom?.trim().orEmpty()
         val room = if (rawRoom.isNotBlank()) rawRoom else "${selectedClass.name}教室"
-        val title = "次は ${subject} です。"
-        val detailText = "${period} の授業は、 ${room} で、 ${subject} です。"
+        val title = "${period}限の授業前通知"
+        val detailText = "${period}限(${startTime}~${endTime})の授業は、${room}で、${subject}です。"
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

@@ -1305,6 +1305,16 @@ class CsvSyncManager(private val context: Context) {
         isUnselectedElective: Boolean = false
     ): PeriodSchedule {
         val sub = subject.trim()
+
+        // 開始時間・終了時間の決定: 既存の startTime / endTime があればそれを使用し、なければ標準時程を使用
+        val (finalStartTime, finalEndTime) = when {
+            startTime.isNotBlank() || endTime.isNotBlank() -> startTime to endTime
+            sub.isNotBlank() && sub != "-" && sub != "なし" && sub != "授業なし" && sub != "空き" -> {
+                com.example.model.StandardPeriodTimes.getTimes(period) ?: ("" to "")
+            }
+            else -> "" to ""
+        }
+
         if (sub.isBlank()) {
             return PeriodSchedule(
                 period = period,
@@ -1315,8 +1325,8 @@ class CsvSyncManager(private val context: Context) {
                 colorHex = 0xFF5C6BC0,
                 isChanged = isChanged,
                 isExam = isExam,
-                startTime = startTime,
-                endTime = endTime,
+                startTime = finalStartTime,
+                endTime = finalEndTime,
                 isUnselectedElective = isUnselectedElective
             )
         }
@@ -1336,8 +1346,8 @@ class CsvSyncManager(private val context: Context) {
             colorHex = colorHex,
             isChanged = isChanged,
             isExam = isExam,
-            startTime = startTime,
-            endTime = endTime,
+            startTime = finalStartTime,
+            endTime = finalEndTime,
             isUnselectedElective = isUnselectedElective
         )
     }

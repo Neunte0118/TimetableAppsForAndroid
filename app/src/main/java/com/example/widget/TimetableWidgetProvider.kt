@@ -382,6 +382,13 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                     R.id.widget_p4_room,
                     R.id.widget_p5_room
                 )
+                val periodTimes = listOf(
+                    R.id.widget_p1_time,
+                    R.id.widget_p2_time,
+                    R.id.widget_p3_time,
+                    R.id.widget_p4_time,
+                    R.id.widget_p5_time
+                )
 
                 val lastPeriodWithSubject = (1..5).indexOfLast { p ->
                     val cell = schedule.periods.find { it.period == p }
@@ -416,6 +423,16 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                 val roomText = cell.classroom.ifBlank { "" }
                                 views.setTextViewText(periodRooms[i], roomText)
 
+                                val timeText = if (cell.startTime.isNotBlank() && cell.endTime.isNotBlank()) {
+                                    "${cell.startTime}-${cell.endTime}"
+                                } else if (cell.startTime.isNotBlank()) {
+                                    cell.startTime
+                                } else {
+                                    ""
+                                }
+                                views.setTextViewText(periodTimes[i], timeText)
+                                views.setViewVisibility(periodTimes[i], if (timeText.isNotBlank()) View.VISIBLE else View.GONE)
+
                                 val defaultRoomColor = context.getColor(R.color.widget_text_muted)
                                 val examRoomColor = context.getColor(R.color.widget_text_exam_room)
 
@@ -441,6 +458,8 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                 views.setTextViewText(periodSubjects[i], "-")
                                 views.setTextColor(periodSubjects[i], defaultSubjectColor)
                                 views.setTextViewText(periodRooms[i], "")
+                                views.setTextViewText(periodTimes[i], "")
+                                views.setViewVisibility(periodTimes[i], View.GONE)
                             }
 
                             val bgRes = when {

@@ -1872,7 +1872,7 @@ fun ElectiveDropdownField(
                                 )
                             }
                             Text(
-                                text = "未選択（指定なし）",
+                                text = "未選択",
                                 fontWeight = if (isNoneSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isNoneSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2335,9 +2335,9 @@ fun DeveloperMenuDialog(
 
                         1 -> {
                             // 2. データ管理 & 診断
-                            Text("【キャッシュ・データ管理】", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                            Text("【データ管理】", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                             Text(
-                                "端末に保存されたキャッシュやメモの消去、同期ステータスの詳細確認を行えます。",
+                                "端末に保存されたキャッシュやメモの消去、同期状況の詳細確認を行えます。",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -2513,7 +2513,7 @@ fun NotificationSettingsDialog(
             Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         },
         title = {
-            Text("時間割・授業通知設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("通知設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         },
         text = {
             Column(
@@ -2541,7 +2541,7 @@ fun NotificationSettingsDialog(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("毎朝の時間割通知", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(
-                                    if (notifEnabled) "有効（毎朝 ${String.format("%02d:%02d", notifHour, notifMinute)} に通知）" else "無効",
+                                    if (notifEnabled) "有効" else "無効",
                                     fontSize = 12.sp,
                                     color = if (notifEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2622,9 +2622,9 @@ fun NotificationSettingsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("次の授業の通知", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("授業前通知", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(
-                                    if (nextClassEnabled) "有効（授業開始の ${leadMin}分前に通知）" else "無効",
+                                    if (nextClassEnabled) "有効" else "無効",
                                     fontSize = 12.sp,
                                     color = if (nextClassEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2641,7 +2641,7 @@ fun NotificationSettingsDialog(
                         if (nextClassEnabled) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                            Text("通知タイミング（開始前）", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            Text("通知タイミング", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -2666,12 +2666,6 @@ fun NotificationSettingsDialog(
                                     )
                                 }
                             }
-
-                            Text(
-                                "※ 時刻表: 1限 8:30 / 2限 9:45 / 3限 11:00 / 4限 12:55 / 5限 14:10\n※ 休日や次の科目がない場合は通知されません。",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
 
                             OutlinedButton(
                                 onClick = onTestSendNextClassNotification,
@@ -2861,7 +2855,7 @@ fun DialDatePickerDialog(
             Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         },
         title = {
-            Text("日付の選択 (ダイヤル式)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text("日付の選択", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         },
         text = {
             Column(
@@ -3160,7 +3154,7 @@ fun AppUpdateModalDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "新しいAPKをダウンロード",
+                            text = "新しいアプリをダウンロード",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -3207,30 +3201,30 @@ fun AppUpdateModalDialog(
 @Composable
 fun HelpDialog(onDismiss: () -> Unit) {
     val basicGuides = listOf(
-        "クラス・選択科目の設定" to "画面上部のクラス名（例: 1組）をタップすると、所属クラスの切り替えや受講する選択科目・講座を設定できます。あなた専用の時間割が自動生成されます。",
+        "クラス・選択科目の設定" to "画面上部のクラス名をタップすると、所属クラスの切り替えや受講する選択科目・講座を設定できます。",
         "列タップで日付選択 & 詳細表示" to "テーブルの日付列をタップすると、その日付がハイライトされ、画面下部にその日の学校行事、入力したメモ、時間割変更の詳細が連動して表示されます。",
-        "時間割 / 移動教室 切り替え" to "画面上部のトグルボタンで、科目名表示と移動教室の表示を瞬時に切り替えられます。教室移動がある授業を素早く把握できます。",
-        "ダイヤル式日付選択" to "画面上部の日付（例: 9月13日）をタップすると、ドラムロール（ダイヤル）式ピッカーが開き、過去や先の日付へスムーズにジャンプできます。",
-        "即時CSV更新（同期ボタン）" to "画面右上の更新ボタンをタップすると、最新の時間割・行事・時間割変更データをスプレッドシートから即座に取得して反映します。",
+        "時間割 / 移動教室 切り替え" to "画面上部のトグルボタンで、科目名表示と移動教室の表示を切り替えられます。",
+        "日付選択" to "画面上部の日付をタップすると、過去や先の日付へスムーズにジャンプできます。",
+        "同期ボタン" to "画面右上の更新ボタンをタップすると、最新の時間割・行事・時間割変更データを即座に取得して反映します。",
         "メモ入力と自動保存" to "テーブル下のメモ欄に持ち物や課題、連絡事項を自由に記録できます。入力内容は端末に自動保存されます。"
     )
 
     val widgetGuides = listOf(
         "2種類のホーム画面ウィジェット" to "ホーム画面に「時間割ウィジェット」と「行事・メモウィジェット」を配置できます。",
-        "ホームボタン (日付リセット)" to "ウィジェット右上の「ホーム」ボタンをタップすると、今日（15:15以降は明日）の日付に素早く戻ります。",
-        "日付切り替え矢印 (◀ / ▶)" to "ウィジェット左右の矢印で、前日や翌日の時間割・行事・メモを手軽に確認できます。",
-        "自動日付更新" to "毎日 0:00 および 15:15 のタイミングで、ウィジェットの基準日が自動的に更新されます。",
+        "ホームボタン" to "ウィジェット右上の「ホーム」ボタンをタップすると、今日（15:15以降は明日）の日付に素早く戻ります。",
+        "日付切り替え" to "ウィジェット左右の矢印で、前日や翌日の時間割・行事・メモを手軽に確認できます。",
+        "自動日付更新" to "毎日 00:00 および 15:15 のタイミングで、ウィジェットの基準日が自動的に更新されます。",
         "ウィジェットの即時更新" to "ウィジェット右上の更新ボタンをタップすると、アプリ内の最新メモや変更情報が即時に反映されます。"
     )
 
     val settingGuides = listOf(
         "表示テーブル数・列数の変更" to "「その他」メニューから表示テーブル数（1〜3個）や1テーブルの列数（3〜7列）を自由に変更できます。",
         "教科テキストのHSV色分け" to "「その他」メニューの「教科の色分け」から、教科グループごとに自由なHSVカラーを割り当てて見やすく色分けできます。",
-        "時間割変更の強調表示" to "通常と異なるコマ（時間割変更）の背景をハイライト表示する機能のON/OFFを設定できます。",
+        "時間割変更の強調表示" to "時間割変更の背景をハイライト表示する機能のON/OFFを設定できます。",
         "文字サイズの変更" to "小・標準・大・特大から時間割文字のサイズを好みに合わせて調整できます。",
-        "毎朝の時間割通知" to "毎朝の設定時刻（例: 7:00）に今日の時間割と移動教室、行事予定が自動で通知されます。",
+        "毎朝の時間割通知" to "毎朝の設定時刻に今日の時間割と移動教室、行事予定が自動で通知されます。",
         "行事予定一覧 & 作成メモ一覧" to "年間の全学校行事や、作成したメモを一覧形式で確認し、対象の日付へワンタップでジャンプできます。",
-        "検索機能" to "キーワード入力により、行事予定・メモ・教科名を高速横断検索できます。",
+        "検索機能" to "キーワード入力により、行事予定・メモ・教科名を高速検索できます。",
         "アプリ更新通知" to "新しいアプリバージョンが公開された際、通知ダイアログが表示されワンタップで最新版をダウンロード・更新できます。"
     )
 
@@ -3455,7 +3449,7 @@ fun OtherMenuModalSheet(
                 icon = Icons.Outlined.Palette,
                 iconTint = colorDisplay,
                 title = "教科の色分け",
-                subtitle = if (isSubjectColorEnabled) "有効 (標準)" else "無効",
+                subtitle = if (isSubjectColorEnabled) "有効" else "無効",
                 onClick = onOpenSubjectColors,
                 testTag = "menu_subject_colors"
             )
@@ -3492,7 +3486,7 @@ fun OtherMenuModalSheet(
                     Column {
                         Text("時間割変更の強調表示", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         Text(
-                            if (isHighlightChangedPeriods) "通常と異なるコマの背景を強調" else "無効（通常背景で表示）",
+                            if (isHighlightChangedPeriods) "有効" else "無効",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -3655,7 +3649,7 @@ fun OtherMenuModalSheet(
                     Column {
                         Text("開発者モード", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         Text(
-                            if (isDeveloperMode) "有効（開発者メニュー利用可能）" else "無効",
+                            if (isDeveloperMode) "有効" else "無効",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

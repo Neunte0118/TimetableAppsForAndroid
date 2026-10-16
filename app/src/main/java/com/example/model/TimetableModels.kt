@@ -62,6 +62,21 @@ data class PeriodSchedule(
     }
 }
 
+object StandardPeriodTimes {
+    fun getTimes(period: Int): Pair<String, String>? {
+        return when (period) {
+            1 -> "8:30" to "9:35"
+            2 -> "9:45" to "10:50"
+            3 -> "11:00" to "12:05"
+            4 -> "12:55" to "14:00"
+            5 -> "14:10" to "15:15"
+            6 -> "15:25" to "16:30"
+            7 -> "16:40" to "17:45"
+            else -> null
+        }
+    }
+}
+
 data class DaySchedule(
     val date: LocalDate,
     val dayLabel: String,      // "今日", "翌日", "2日後", "3日後", etc.
