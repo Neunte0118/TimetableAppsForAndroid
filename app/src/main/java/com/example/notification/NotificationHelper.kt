@@ -308,26 +308,10 @@ object NotificationHelper {
             ?.takeIf { it.isNotBlank() }
             ?: StandardPeriodTimes.getTimes(period)?.second.orEmpty()
 
-        val timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) {
-            "${startTime}〜${endTime}"
-        } else if (startTime.isNotBlank()) {
-            "${startTime}開始"
-        } else {
-            ""
-        }
-
         val rawRoom = periodSchedule?.classroom?.trim().orEmpty()
         val room = if (rawRoom.isNotBlank()) rawRoom else "${selectedClass.name}教室"
-        val title = if (timeRange.isNotBlank()) {
-            "${period}限 ${timeRange} 授業前通知"
-        } else {
-            "${period}限の授業前通知"
-        }
-        val detailText = if (timeRange.isNotBlank()) {
-            "${period}限 ${timeRange} の授業は、${room}で、${subject}です。"
-        } else {
-            "${period}限の授業は、${room}で、${subject}です。"
-        }
+        val title = "次の時間は${subject}です。"
+        val detailText = "${period}限の授業前通知をお知らせします:\n科目:${subject}\n教室:${room}\n開始:${startTime}\n終了:${endTime}"
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

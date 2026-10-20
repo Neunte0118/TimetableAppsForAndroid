@@ -471,10 +471,13 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                     views.setViewVisibility(periodStartTimes[i], View.GONE)
                                     views.setViewVisibility(periodEndTimes[i], View.GONE)
 
+                                    val standardTimes = com.example.model.StandardPeriodTimes.getTimes(periodNum)
                                     val timeText = if (cell.startTime.isNotBlank() && cell.endTime.isNotBlank()) {
                                         "${cell.startTime}-${cell.endTime}"
                                     } else if (cell.startTime.isNotBlank()) {
                                         cell.startTime
+                                    } else if (standardTimes != null) {
+                                        "${standardTimes.first}-${standardTimes.second}"
                                     } else {
                                         ""
                                     }

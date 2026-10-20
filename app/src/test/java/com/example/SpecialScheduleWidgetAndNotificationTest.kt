@@ -120,5 +120,10 @@ class SpecialScheduleWidgetAndNotificationTest {
         // 普通時間割でも8:30〜9:35が含まれていることを確認
         assertTrue("タイトルに時間が含まれる", title.contains("8:30〜9:35"))
         assertTrue("本文に時間が含まれる", text.contains("8:30〜9:35"))
+
+        // アプリ内時間割グリッドの表示フラグ判定 (普通時間割は表示しない、特別時程・考査時程のみ表示)
+        val isSpecialOrExamInApp = p1.isExam || p1.isSpecialSchedule
+        assertFalse("普通時間割はアプリ内で開始・終了時間を表示しない", isSpecialOrExamInApp)
     }
 }
+

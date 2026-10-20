@@ -404,8 +404,9 @@ fun TimetableTable(
                                             .fillMaxSize()
                                             .padding(horizontal = 2.dp, vertical = 2.dp)
                                     ) {
-                                        // 開始時間（左上: 考査または特別時程）
-                                        if (periodSchedule.startTime.isNotBlank()) {
+                                        // 開始時間（左上: 考査または特別時程のみ表示。普通時間割ではアプリ内非表示）
+                                        val isSpecialOrExamPeriod = periodSchedule.isExam || periodSchedule.isSpecialSchedule
+                                        if (isSpecialOrExamPeriod && periodSchedule.startTime.isNotBlank()) {
                                             val timeTextColor = if (periodSchedule.isExam) examTimeTextColor
                                                 else if (isDark) Color(0xFFB0BEC5) else Color(0xFF455A64)
                                             Text(
@@ -420,8 +421,8 @@ fun TimetableTable(
                                             )
                                         }
 
-                                        // 終了時間（左下: 考査または特別時程）
-                                        if (periodSchedule.endTime.isNotBlank()) {
+                                        // 終了時間（左下: 考査または特別時程のみ表示。普通時間割ではアプリ内非表示）
+                                        if (isSpecialOrExamPeriod && periodSchedule.endTime.isNotBlank()) {
                                             val timeTextColor = if (periodSchedule.isExam) examTimeTextColor
                                                 else if (isDark) Color(0xFFB0BEC5) else Color(0xFF455A64)
                                             Text(

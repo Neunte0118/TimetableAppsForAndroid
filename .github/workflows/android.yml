@@ -1,11 +1,16 @@
+
 name: Android CI
 
 on:
   push:
     branches: ["main"]
+    tags: ["v*.*.*"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -45,9 +50,27 @@ jobs:
             -Pandroid.injected.signing.key.alias="$TIMETABLE_KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$TIMETABLE_KEY_PASSWORD"
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v6
+      - name: Prepare Release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mapfile -t APK_FILES < <(
+            find . -type f -path '*/build/outputs/apk/release/*.apk'
+          )
+
+          if [ "${#APK_FILES[@]}" -ne 1 ]; then
+            echo "Expected exactly one release APK, found ${#APK_FILES[@]}"
+            printf '%s\n' "${APK_FILES[@]}"
+            exit 1
+          fi
+
+          cp "${APK_FILES[0]}" \
+            "timetable-app-${GITHUB_REF_NAME}.apk"
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
         with:
-          name: timetable-app-release
-          path: "**/build/outputs/apk/release/*.apk"
-          if-no-files-found: error
+          tag_name: ${{ github.ref_name }}
+          name: Timetable ${{ github.ref_name }}
+          generate_release_notes: true
+          files: timetable-app-${{ github.ref_name }}.apk
