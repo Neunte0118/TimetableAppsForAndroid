@@ -28,11 +28,34 @@ class CsvSyncManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("csv_sync_prefs", Context.MODE_PRIVATE)
 
     private val httpClient = OkHttpClient.Builder()
+        .dispatcher(okhttp3.Dispatcher().apply {
+            maxRequests = 24
+            maxRequestsPerHost = 20
+        })
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
+
+    companion object {
+        const val INTERVAL_WEEK_MILLIS = 7L * 24 * 60 * 60 * 1000
+        const val INTERVAL_DAY_MILLIS = 24L * 60 * 60 * 1000
+
+        const val KEY_TS_HOLIDAYS = "sync_ts_holidays"
+        const val KEY_TS_BASIC_CLASS = "sync_ts_basic_class"
+        const val KEY_TS_SECOND_TERM_CLASS = "sync_ts_second_term_class"
+        const val KEY_TS_SUBJECT_MAPPINGS = "sync_ts_subject_mappings"
+
+        const val KEY_TS_COMMON_SCHEDULE = "sync_ts_common_schedule"
+        const val KEY_TS_ELECTIVES = "sync_ts_electives"
+        const val KEY_TS_UPDATES = "sync_ts_updates"
+        const val KEY_TS_EVENTS = "sync_ts_events"
+        const val KEY_TS_TIMETABLE_CHANGES = "sync_ts_timetable_changes"
+        const val KEY_TS_COURSE_CHANGES = "sync_ts_course_changes"
+        const val KEY_TS_EXAM_SCHEDULE = "sync_ts_exam_schedule"
+        const val KEY_TS_SPECIAL_SCHEDULE = "sync_ts_special_schedule"
+    }
 
     // Config & Status Flows
     private val _urlsConfig = MutableStateFlow(loadUrlsConfig())
@@ -283,6 +306,15 @@ class CsvSyncManager(private val context: Context) {
         updateSubjectMappings(list)
     }
 
+    fun shouldFetchCsv(cacheKey: String, timestampKey: String, intervalMillis: Long, force: Boolean): Boolean {
+        if (force) return true
+        if (!prefs.contains(cacheKey)) return true
+        val lastSync = prefs.getLong(timestampKey, 0L)
+        if (lastSync <= 0L) return true
+        val elapsed = System.currentTimeMillis() - lastSync
+        return elapsed >= intervalMillis
+    }
+
     fun clearAllCache() {
         prefs.edit()
             .remove("csv_cache_basic_class")
@@ -296,6 +328,19 @@ class CsvSyncManager(private val context: Context) {
             .remove("csv_cache_exam_schedule")
             .remove("csv_cache_subject_mappings")
             .remove("csv_cache_special_schedule")
+            .remove("csv_cache_second_term_class")
+            .remove(KEY_TS_HOLIDAYS)
+            .remove(KEY_TS_BASIC_CLASS)
+            .remove(KEY_TS_SECOND_TERM_CLASS)
+            .remove(KEY_TS_SUBJECT_MAPPINGS)
+            .remove(KEY_TS_COMMON_SCHEDULE)
+            .remove(KEY_TS_ELECTIVES)
+            .remove(KEY_TS_UPDATES)
+            .remove(KEY_TS_EVENTS)
+            .remove(KEY_TS_TIMETABLE_CHANGES)
+            .remove(KEY_TS_COURSE_CHANGES)
+            .remove(KEY_TS_EXAM_SCHEDULE)
+            .remove(KEY_TS_SPECIAL_SCHEDULE)
             .remove("last_sync_time")
             .remove("last_sync_message")
             .apply()
@@ -303,153 +348,205 @@ class CsvSyncManager(private val context: Context) {
     }
 
     /**
-     * Downloads CSVs from the configured URLs concurrently.
+     * Downloads CSVs with 1-week and 1-day intervals.
      */
-    suspend fun syncAllCsvs(): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun syncAllCsvs(force: Boolean = false): Result<String> = withContext(Dispatchers.IO) {
         _syncStatus.value = _syncStatus.value.copy(isSyncing = true, lastSyncMessage = "CSVデータをダウンロード中...")
 
         val config = _urlsConfig.value
         val errors = mutableListOf<String>()
         var updatedCount = 0
+        val now = System.currentTimeMillis()
+
+        // 1週間に1回取得するグループ: 祝日、前期クラス別時間割、後期クラス別時間割、科目対応表
+        val fetchHolidays = shouldFetchCsv("csv_cache_holidays", KEY_TS_HOLIDAYS, INTERVAL_WEEK_MILLIS, force)
+        val fetchBasic = shouldFetchCsv("csv_cache_basic_class", KEY_TS_BASIC_CLASS, INTERVAL_WEEK_MILLIS, force)
+        val fetchSecondTerm = shouldFetchCsv("csv_cache_second_term_class", KEY_TS_SECOND_TERM_CLASS, INTERVAL_WEEK_MILLIS, force)
+        val fetchSubjectMapping = shouldFetchCsv("csv_cache_subject_mappings", KEY_TS_SUBJECT_MAPPINGS, INTERVAL_WEEK_MILLIS, force)
+
+        // それ以外は1日に1回取得するグループ
+        val fetchCommon = shouldFetchCsv("csv_cache_common_schedule", KEY_TS_COMMON_SCHEDULE, INTERVAL_DAY_MILLIS, force)
+        val fetchElectives = shouldFetchCsv("csv_cache_electives", KEY_TS_ELECTIVES, INTERVAL_DAY_MILLIS, force)
+        val fetchUpdates = shouldFetchCsv("csv_cache_updates", KEY_TS_UPDATES, INTERVAL_DAY_MILLIS, force)
+        val fetchEvents = shouldFetchCsv("csv_cache_events", KEY_TS_EVENTS, INTERVAL_DAY_MILLIS, force)
+        val fetchTimetableChanges = shouldFetchCsv("csv_cache_timetable_changes", KEY_TS_TIMETABLE_CHANGES, INTERVAL_DAY_MILLIS, force)
+        val fetchCourseChanges = shouldFetchCsv("csv_cache_course_changes", KEY_TS_COURSE_CHANGES, INTERVAL_DAY_MILLIS, force)
+        val fetchExam = shouldFetchCsv("csv_cache_exam_schedule", KEY_TS_EXAM_SCHEDULE, INTERVAL_DAY_MILLIS, force)
+        val fetchSpecial = shouldFetchCsv("csv_cache_special_schedule", KEY_TS_SPECIAL_SCHEDULE, INTERVAL_DAY_MILLIS, force)
 
         coroutineScope {
-            val commonDeferred = if (config.commonScheduleUrl.isNotBlank()) {
+            val commonDeferred = if (fetchCommon && config.commonScheduleUrl.isNotBlank()) {
                 async { fetchUrlContent(config.commonScheduleUrl) }
             } else null
 
-            val basicDeferred = if (config.basicClassUrl.isNotBlank()) {
+            val basicDeferred = if (fetchBasic && config.basicClassUrl.isNotBlank()) {
                 async { fetchUrlContent(config.basicClassUrl) }
             } else null
 
-            val electivesDeferred = if (config.electivesUrl.isNotBlank()) {
+            val electivesDeferred = if (fetchElectives && config.electivesUrl.isNotBlank()) {
                 async { fetchUrlContent(config.electivesUrl) }
             } else null
 
-            val updatesDeferred = if (config.updatesUrl.isNotBlank()) {
+            val updatesDeferred = if (fetchUpdates && config.updatesUrl.isNotBlank()) {
                 async { fetchUrlContent(config.updatesUrl) }
             } else null
 
-            val eventsDeferred = if (config.eventsUrl.isNotBlank()) {
+            val eventsDeferred = if (fetchEvents && config.eventsUrl.isNotBlank()) {
                 async { fetchUrlContent(config.eventsUrl) }
             } else null
 
-            val holidaysDeferred = if (config.holidaysUrl.isNotBlank()) {
+            val holidaysDeferred = if (fetchHolidays && config.holidaysUrl.isNotBlank()) {
                 async { fetchUrlContent(config.holidaysUrl) }
             } else null
 
-            val timetableChangesDeferred = if (config.timetableChangeSheetUrl.isNotBlank()) {
+            val timetableChangesDeferred = if (fetchTimetableChanges && config.timetableChangeSheetUrl.isNotBlank()) {
                 async { fetchUrlContent(config.timetableChangeSheetUrl) }
             } else null
 
-            val courseChangesDeferred = if (config.courseChangeSheetUrl.isNotBlank()) {
+            val courseChangesDeferred = if (fetchCourseChanges && config.courseChangeSheetUrl.isNotBlank()) {
                 async { fetchUrlContent(config.courseChangeSheetUrl) }
             } else null
 
-            val examDeferred = if (config.examScheduleUrl.isNotBlank()) {
+            val examDeferred = if (fetchExam && config.examScheduleUrl.isNotBlank()) {
                 async { fetchUrlContent(config.examScheduleUrl) }
             } else null
 
-            val subjectMappingDeferred = if (config.subjectMappingUrl.isNotBlank()) {
+            val subjectMappingDeferred = if (fetchSubjectMapping && config.subjectMappingUrl.isNotBlank()) {
                 async { fetchUrlContent(config.subjectMappingUrl) }
             } else null
 
-            val specialScheduleDeferred = if (config.specialScheduleUrl.isNotBlank()) {
+            val specialScheduleDeferred = if (fetchSpecial && config.specialScheduleUrl.isNotBlank()) {
                 async { fetchUrlContent(config.specialScheduleUrl) }
             } else null
 
-            val secondTermDeferred = if (config.secondTermClassUrl.isNotBlank()) {
+            val secondTermDeferred = if (fetchSecondTerm && config.secondTermClassUrl.isNotBlank()) {
                 async { fetchUrlContent(config.secondTermClassUrl) }
             } else null
 
-            // 結果を並列待機して反映
             commonDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_common_schedule", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_common_schedule", text)
+                    .putLong(KEY_TS_COMMON_SCHEDULE, now)
+                    .apply()
                 commonSchedules = CsvParser.parseCommonSchedule(text)
                 updatedCount++
-            }?.onFailure { errors.add("時間割(予定): ${it.localizedMessage}") }
+            }?.onFailure { errors.add("時間割予定: " + it.localizedMessage) }
 
             basicDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_basic_class", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_basic_class", text)
+                    .putLong(KEY_TS_BASIC_CLASS, now)
+                    .apply()
                 basicClassSchedule = CsvParser.parseBasicClassSchedule(text)
                 updatedCount++
-            }?.onFailure { errors.add("クラス別時間割: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("前期クラス別時間割: " + it.localizedMessage) }
 
             electivesDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_electives", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_electives", text)
+                    .putLong(KEY_TS_ELECTIVES, now)
+                    .apply()
                 electives = CsvParser.parseElectives(text)
                 updatedCount++
-            }?.onFailure { errors.add("選択科目: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("選択科目: " + it.localizedMessage) }
 
             updatesDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_updates", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_updates", text)
+                    .putLong(KEY_TS_UPDATES, now)
+                    .apply()
                 updateHistories = CsvParser.parseUpdateHistory(text)
                 latestAppUpdateInfo = CsvParser.parseAppUpdateInfo(text)
                 updatedCount++
-            }?.onFailure { errors.add("更新情報: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("更新情報: " + it.localizedMessage) }
 
             eventsDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_events", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_events", text)
+                    .putLong(KEY_TS_EVENTS, now)
+                    .apply()
                 events = CsvParser.parseEvents(text)
                 updatedCount++
-            }?.onFailure { errors.add("行事予定: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("行事予定: " + it.localizedMessage) }
 
             holidaysDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_holidays", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_holidays", text)
+                    .putLong(KEY_TS_HOLIDAYS, now)
+                    .apply()
                 holidays = CsvParser.parseHolidays(text)
                 updatedCount++
-            }?.onFailure { errors.add("祝日: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("祝日: " + it.localizedMessage) }
 
             timetableChangesDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_timetable_changes", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_timetable_changes", text)
+                    .putLong(KEY_TS_TIMETABLE_CHANGES, now)
+                    .apply()
                 timetableChanges = CsvParser.parseTimetableChanges(text)
                 updatedCount++
-            }?.onFailure { errors.add("時間割変更届: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("時間割変更届: " + it.localizedMessage) }
 
             courseChangesDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_course_changes", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_course_changes", text)
+                    .putLong(KEY_TS_COURSE_CHANGES, now)
+                    .apply()
                 courseChanges = CsvParser.parseCourseChanges(text)
                 updatedCount++
-            }?.onFailure { errors.add("講座変更: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("講座変更: " + it.localizedMessage) }
 
             examDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_exam_schedule", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_exam_schedule", text)
+                    .putLong(KEY_TS_EXAM_SCHEDULE, now)
+                    .apply()
                 examSchedules = CsvParser.parseExamSchedule(text)
                 updatedCount++
-            }?.onFailure { errors.add("考査時間割: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("考査時間割: " + it.localizedMessage) }
 
             subjectMappingDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_subject_mappings", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_subject_mappings", text)
+                    .putLong(KEY_TS_SUBJECT_MAPPINGS, now)
+                    .apply()
                 val parsed = CsvParser.parseSubjectMapping(text)
                 updateSubjectMappings(parsed)
                 updatedCount++
-            }?.onFailure { errors.add("科目対応表: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("科目対応表: " + it.localizedMessage) }
 
             specialScheduleDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_special_schedule", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_special_schedule", text)
+                    .putLong(KEY_TS_SPECIAL_SCHEDULE, now)
+                    .apply()
                 specialSchedules = CsvParser.parseSpecialSchedule(text)
                 updatedCount++
-            }?.onFailure { errors.add("特別時程時間割: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("特別時程時間割: " + it.localizedMessage) }
 
             secondTermDeferred?.await()?.onSuccess { text ->
-                prefs.edit().putString("csv_cache_second_term_class", text).apply()
+                prefs.edit()
+                    .putString("csv_cache_second_term_class", text)
+                    .putLong(KEY_TS_SECOND_TERM_CLASS, now)
+                    .apply()
                 secondTermClassSchedule = CsvParser.parseBasicClassSchedule(text)
                 updatedCount++
-            }?.onFailure { errors.add("後期クラス別時間割: ${it.localizedMessage}") }
+            }?.onFailure { errors.add("後期クラス別時間割: " + it.localizedMessage) }
         }
 
-        if (updatedCount == 0 && errors.isEmpty()) {
+        if (updatedCount > 0) {
+            rebuildIndexMaps()
+        } else if (errors.isEmpty()) {
             loadAndParseLocalData()
         }
 
         val nowStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("M/d HH:mm:ss", Locale.JAPANESE))
-        val isSuccess = updatedCount > 0 || errors.isEmpty()
-        val message = if (updatedCount > 0) {
-            if (errors.isEmpty()) "全${updatedCount}種類のCSV同期に成功しました ($nowStr)"
-            else "${updatedCount}種類のCSV同期に成功しました（一部未更新）($nowStr)"
-        } else if (errors.isEmpty()) {
-            "CSVデータを読み込みました"
-        } else {
-            "インターネットに接続されていません。キャッシュデータを表示しています"
+        val isSuccess = errors.isEmpty()
+        val message = when {
+            updatedCount > 0 && errors.isEmpty() -> "${updatedCount}種類のCSV同期に成功しました - $nowStr"
+            updatedCount > 0 && errors.isNotEmpty() -> "${updatedCount}種類のCSV同期に成功しました 一部未更新 - $nowStr"
+            errors.isEmpty() -> "最新のキャッシュデータを利用しています - $nowStr"
+            else -> "インターネットに接続されていません キャッシュデータを表示しています"
         }
 
         prefs.edit()
@@ -1006,6 +1103,7 @@ class CsvSyncManager(private val context: Context) {
             classroom = classroom,
             isChanged = isChangedByNotification,
             isExam = false,
+            isSpecialSchedule = (specialRow != null),
             startTime = specialStartTime,
             endTime = specialEndTime,
             isUnselectedElective = isUnselectedElective
@@ -1294,19 +1392,25 @@ class CsvSyncManager(private val context: Context) {
     /**
      * Creates PeriodSchedule with clean theme colors and actual CSV classroom (no mock data).
      */
+    fun isExamOrSpecialDate(date: LocalDate): Boolean {
+        val key = date.monthValue to date.dayOfMonth
+        return (examSchedulesByDate[key]?.isNotEmpty() == true) ||
+               (specialSchedulesByDate[key]?.isNotEmpty() == true)
+    }
+
     private fun createPeriodSchedule(
         period: Int,
         subject: String,
         classroom: String,
         isChanged: Boolean = false,
         isExam: Boolean = false,
+        isSpecialSchedule: Boolean = false,
         startTime: String = "",
         endTime: String = "",
         isUnselectedElective: Boolean = false
     ): PeriodSchedule {
         val sub = subject.trim()
 
-        // 開始時間・終了時間の決定: 既存の startTime / endTime があればそれを使用し、なければ標準時程を使用
         val (finalStartTime, finalEndTime) = when {
             startTime.isNotBlank() || endTime.isNotBlank() -> startTime to endTime
             sub.isNotBlank() && sub != "-" && sub != "なし" && sub != "授業なし" && sub != "空き" -> {
@@ -1325,6 +1429,7 @@ class CsvSyncManager(private val context: Context) {
                 colorHex = 0xFF5C6BC0,
                 isChanged = isChanged,
                 isExam = isExam,
+                isSpecialSchedule = isSpecialSchedule,
                 startTime = finalStartTime,
                 endTime = finalEndTime,
                 isUnselectedElective = isUnselectedElective
@@ -1346,6 +1451,7 @@ class CsvSyncManager(private val context: Context) {
             colorHex = colorHex,
             isChanged = isChanged,
             isExam = isExam,
+            isSpecialSchedule = isSpecialSchedule,
             startTime = finalStartTime,
             endTime = finalEndTime,
             isUnselectedElective = isUnselectedElective

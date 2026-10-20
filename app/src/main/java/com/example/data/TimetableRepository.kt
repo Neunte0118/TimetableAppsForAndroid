@@ -374,9 +374,9 @@ class TimetableRepository(private val context: Context) {
         csvSyncManager.saveUrlsConfig(config)
     }
 
-    suspend fun syncCsvData(): Result<String> {
+    suspend fun syncCsvData(force: Boolean = false): Result<String> {
         clearScheduleCache()
-        val res = csvSyncManager.syncAllCsvs()
+        val res = csvSyncManager.syncAllCsvs(force)
         clearScheduleCache()
         TimetableWidgetProvider.updateAllWidgets(context)
         EventMemoWidgetProvider.updateAllWidgets(context)

@@ -46,6 +46,7 @@ data class PeriodSchedule(
     val colorHex: Long = 0xFF90A4AEL,
     val isChanged: Boolean = false, // 時間割変更フラグ
     val isExam: Boolean = false,    // 考査フラグ
+    val isSpecialSchedule: Boolean = false, // 特別時程フラグ
     val startTime: String = "",     // 開始時間 (例: 8:50)
     val endTime: String = "",       // 終了時間 (例: 9:40)
     val isUnselectedElective: Boolean = false // 選択していない科目フラグ（未選択時は灰色表示）

@@ -700,16 +700,16 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         refreshSchedules()
     }
 
-    fun syncCsvData() {
+    fun syncCsvData(force: Boolean = false) {
         viewModelScope.launch {
-            val result = repository.syncCsvData()
+            val result = repository.syncCsvData(force)
             val selectedClass = _uiState.value.selectedClass
             val options = repository.csvSyncManager.getElectiveOptionsForClass(selectedClass.id)
             val userChoices = repository.getElectiveSelectionsForClass(selectedClass.id)
             val infoMsg = if (result.isSuccess) {
                 "時間割データを最新に更新しました"
             } else {
-                "インターネットに接続されていません。事前に取得したデータを表示しています"
+                "インターネットに接続されていません 事前に取得したデータを表示しています"
             }
             _uiState.update {
                 it.copy(

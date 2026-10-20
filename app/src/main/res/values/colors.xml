@@ -40,4 +40,7 @@
     <color name="widget_memo_section_border">#DCFCE7</color>
     <color name="widget_memo_title">#047857</color>
     <color name="widget_memo_text">#064E3B</color>
+
+    <color name="widget_special_time_text">#4F46E5</color>
+    <color name="widget_exam_time_text">#7E22CE</color>
 </resources>

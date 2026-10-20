@@ -179,7 +179,7 @@ object NotificationHelper {
         val schedule = repo.getDaySchedule(selectedClass, today, today)
 
         val testPrefix = if (isTest) "[テスト配信] " else ""
-        val header = "${testPrefix}${today.format(DateTimeFormatter.ofPattern("M月d日（E）の時間割", Locale.JAPANESE))}"
+        val header = "${testPrefix}${today.format(DateTimeFormatter.ofPattern("M月d日の時間割", Locale.JAPANESE))}"
 
         val bodyBuilder = StringBuilder()
 
@@ -301,17 +301,33 @@ object NotificationHelper {
         // 開始時間：CSVの値を優先し、なければ標準時刻
         val startTime = periodSchedule?.startTime?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: StandardPeriodTimes.getTimes(period)?.first
+            ?: StandardPeriodTimes.getTimes(period)?.first.orEmpty()
 
         // 終了時間：CSVの値を優先し、なければ標準時刻
         val endTime = periodSchedule?.endTime?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: StandardPeriodTimes.getTimes(period)?.second
-            
+            ?: StandardPeriodTimes.getTimes(period)?.second.orEmpty()
+
+        val timeRange = if (startTime.isNotBlank() && endTime.isNotBlank()) {
+            "${startTime}〜${endTime}"
+        } else if (startTime.isNotBlank()) {
+            "${startTime}開始"
+        } else {
+            ""
+        }
+
         val rawRoom = periodSchedule?.classroom?.trim().orEmpty()
         val room = if (rawRoom.isNotBlank()) rawRoom else "${selectedClass.name}教室"
-        val title = "${period}限の授業前通知"
-        val detailText = "${period}限(${startTime}~${endTime})の授業は、${room}で、${subject}です。"
+        val title = if (timeRange.isNotBlank()) {
+            "${period}限 ${timeRange} 授業前通知"
+        } else {
+            "${period}限の授業前通知"
+        }
+        val detailText = if (timeRange.isNotBlank()) {
+            "${period}限 ${timeRange} の授業は、${room}で、${subject}です。"
+        } else {
+            "${period}限の授業は、${room}で、${subject}です。"
+        }
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

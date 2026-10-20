@@ -389,6 +389,20 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                     R.id.widget_p4_time,
                     R.id.widget_p5_time
                 )
+                val periodStartTimes = listOf(
+                    R.id.widget_p1_start_time,
+                    R.id.widget_p2_start_time,
+                    R.id.widget_p3_start_time,
+                    R.id.widget_p4_start_time,
+                    R.id.widget_p5_start_time
+                )
+                val periodEndTimes = listOf(
+                    R.id.widget_p1_end_time,
+                    R.id.widget_p2_end_time,
+                    R.id.widget_p3_end_time,
+                    R.id.widget_p4_end_time,
+                    R.id.widget_p5_end_time
+                )
 
                 val lastPeriodWithSubject = (1..5).indexOfLast { p ->
                     val cell = schedule.periods.find { it.period == p }
@@ -398,6 +412,7 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                 val isColorEnabled = repo.isSubjectColorEnabled.value
                 val colorGroups = repo.subjectColorGroups.value
                 val defaultSubjectColor = context.getColor(R.color.widget_text_primary)
+                val isDateSpecialOrExam = repo.csvSyncManager.isExamOrSpecialDate(targetDate)
 
                 if (lastPeriodWithSubject == 0) {
                     views.setViewVisibility(R.id.widget_periods_container, View.GONE)
@@ -409,7 +424,6 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                     for (i in 0 until 5) {
                         val periodNum = i + 1
                         if (periodNum > lastPeriodWithSubject) {
-                            // その時間の時間割が存在しない（最終限を超えている）場合は5限等も含め行ごと削除
                             views.setViewVisibility(periodContainers[i], View.GONE)
                         } else {
                             views.setViewVisibility(periodContainers[i], View.VISIBLE)
@@ -423,15 +437,50 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                 val roomText = cell.classroom.ifBlank { "" }
                                 views.setTextViewText(periodRooms[i], roomText)
 
-                                val timeText = if (cell.startTime.isNotBlank() && cell.endTime.isNotBlank()) {
-                                    "${cell.startTime}-${cell.endTime}"
-                                } else if (cell.startTime.isNotBlank()) {
-                                    cell.startTime
+                                val isSpecialOrExam = cell.isSpecialSchedule || cell.isExam || isDateSpecialOrExam
+
+                                if (isSpecialOrExam) {
+                                    val sTime = cell.startTime.trim()
+                                    val eTime = cell.endTime.trim()
+
+                                    if (sTime.isNotBlank()) {
+                                        views.setTextViewText(periodStartTimes[i], sTime)
+                                        views.setViewVisibility(periodStartTimes[i], View.VISIBLE)
+                                    } else {
+                                        views.setViewVisibility(periodStartTimes[i], View.GONE)
+                                    }
+
+                                    if (eTime.isNotBlank()) {
+                                        views.setTextViewText(periodEndTimes[i], eTime)
+                                        views.setViewVisibility(periodEndTimes[i], View.VISIBLE)
+                                    } else {
+                                        views.setViewVisibility(periodEndTimes[i], View.GONE)
+                                    }
+
+                                    val timeColor = if (cell.isExam) {
+                                        context.getColor(R.color.widget_exam_time_text)
+                                    } else {
+                                        context.getColor(R.color.widget_special_time_text)
+                                    }
+                                    views.setTextColor(periodStartTimes[i], timeColor)
+                                    views.setTextColor(periodEndTimes[i], timeColor)
+
+                                    // 特別時程および考査時程は科目の上下に時間が出るため左側時間を非表示
+                                    views.setViewVisibility(periodTimes[i], View.GONE)
                                 } else {
-                                    ""
+                                    views.setViewVisibility(periodStartTimes[i], View.GONE)
+                                    views.setViewVisibility(periodEndTimes[i], View.GONE)
+
+                                    val timeText = if (cell.startTime.isNotBlank() && cell.endTime.isNotBlank()) {
+                                        "${cell.startTime}-${cell.endTime}"
+                                    } else if (cell.startTime.isNotBlank()) {
+                                        cell.startTime
+                                    } else {
+                                        ""
+                                    }
+                                    views.setTextViewText(periodTimes[i], timeText)
+                                    views.setViewVisibility(periodTimes[i], if (timeText.isNotBlank()) View.VISIBLE else View.GONE)
                                 }
-                                views.setTextViewText(periodTimes[i], timeText)
-                                views.setViewVisibility(periodTimes[i], if (timeText.isNotBlank()) View.VISIBLE else View.GONE)
 
                                 val defaultRoomColor = context.getColor(R.color.widget_text_muted)
                                 val examRoomColor = context.getColor(R.color.widget_text_exam_room)
@@ -454,12 +503,13 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                     views.setTextColor(periodRooms[i], defaultRoomColor)
                                 }
                             } else {
-                                // 間の空きコマにはハイフンを表示
                                 views.setTextViewText(periodSubjects[i], "-")
                                 views.setTextColor(periodSubjects[i], defaultSubjectColor)
                                 views.setTextViewText(periodRooms[i], "")
                                 views.setTextViewText(periodTimes[i], "")
                                 views.setViewVisibility(periodTimes[i], View.GONE)
+                                views.setViewVisibility(periodStartTimes[i], View.GONE)
+                                views.setViewVisibility(periodEndTimes[i], View.GONE)
                             }
 
                             val bgRes = when {
