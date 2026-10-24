@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:padding="8dp">
 
-    <!-- Top Header Bar: [<] [Date] [>] + [Refresh Button] -->
+    <!-- Top Header Bar: [<] [Date] [>] + [Home Button] -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -106,7 +106,7 @@
             android:textSize="13sp" />
     </LinearLayout>
 
-    <!-- 5 Periods Vertical Rows: 1 {subject} ... 5 {subject} -->
+    <!-- Periods Vertical Rows: 1 {subject} ... 5 {subject} (up to 8) -->
     <LinearLayout
         android:id="@+id/widget_periods_container"
         android:layout_width="match_parent"
@@ -138,61 +138,19 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_p1_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:gravity="center_vertical"
-                android:singleLine="true"
-                android:text="8:30-9:35"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9.5sp" />
-
-            <LinearLayout
-                android:id="@+id/widget_p1_subject_container"
+                android:id="@+id/widget_p1_subject"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:gravity="center_vertical|start"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_p1_start_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="8:50"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/widget_p1_subject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="国語"
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/widget_p1_end_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="9:40"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+                android:maxLines="1"
+                android:text="国語"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_p1_room"
@@ -230,61 +188,19 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_p2_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:gravity="center_vertical"
-                android:singleLine="true"
-                android:text="9:45-10:50"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9.5sp" />
-
-            <LinearLayout
-                android:id="@+id/widget_p2_subject_container"
+                android:id="@+id/widget_p2_subject"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:gravity="center_vertical|start"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_p2_start_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="9:45"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/widget_p2_subject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="数学"
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/widget_p2_end_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="10:50"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+                android:maxLines="1"
+                android:text="数学"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_p2_room"
@@ -322,61 +238,19 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_p3_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:gravity="center_vertical"
-                android:singleLine="true"
-                android:text="11:00-12:05"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9.5sp" />
-
-            <LinearLayout
-                android:id="@+id/widget_p3_subject_container"
+                android:id="@+id/widget_p3_subject"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:gravity="center_vertical|start"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_p3_start_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="11:00"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/widget_p3_subject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="英語"
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/widget_p3_end_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="12:05"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+                android:maxLines="1"
+                android:text="英語"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_p3_room"
@@ -414,61 +288,19 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_p4_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:gravity="center_vertical"
-                android:singleLine="true"
-                android:text="12:55-14:00"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9.5sp" />
-
-            <LinearLayout
-                android:id="@+id/widget_p4_subject_container"
+                android:id="@+id/widget_p4_subject"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:gravity="center_vertical|start"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_p4_start_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="12:55"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/widget_p4_subject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="理科"
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/widget_p4_end_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="14:00"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+                android:maxLines="1"
+                android:text="理科"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_p4_room"
@@ -477,7 +309,7 @@
                 android:layout_marginStart="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="化学室"
+                android:text="理科室"
                 android:textColor="@color/widget_text_muted"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -487,6 +319,7 @@
             android:id="@+id/widget_p5_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
+            android:layout_marginBottom="3dp"
             android:layout_weight="1"
             android:background="@drawable/widget_period_cell_bg"
             android:gravity="center_vertical"
@@ -505,61 +338,19 @@
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_p5_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:gravity="center_vertical"
-                android:singleLine="true"
-                android:text="14:10-15:15"
-                android:textColor="@color/widget_text_secondary"
-                android:textSize="9.5sp" />
-
-            <LinearLayout
-                android:id="@+id/widget_p5_subject_container"
+                android:id="@+id/widget_p5_subject"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:gravity="center_vertical|start"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_p5_start_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="14:10"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/widget_p5_subject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="社会"
-                    android:textColor="@color/widget_text_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/widget_p5_end_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:text="15:15"
-                    android:textColor="@color/widget_special_time_text"
-                    android:textSize="9sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+                android:maxLines="1"
+                android:text="社会"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_p5_room"
@@ -569,6 +360,158 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="1組教室"
+                android:textColor="@color/widget_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 6限（6限以上ある場合に表示） -->
+        <LinearLayout
+            android:id="@+id/widget_p6_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginBottom="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_period_cell_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_p6_num"
+                android:layout_width="18dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="6"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_p6_subject"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center_vertical|start"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_p6_room"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/widget_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 7限（7限以上ある場合に表示） -->
+        <LinearLayout
+            android:id="@+id/widget_p7_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginBottom="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_period_cell_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_p7_num"
+                android:layout_width="18dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="7"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_p7_subject"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center_vertical|start"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_p7_room"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/widget_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 8限（8限以上ある場合に表示） -->
+        <LinearLayout
+            android:id="@+id/widget_p8_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_period_cell_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/widget_p8_num"
+                android:layout_width="18dp"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="8"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="13.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_p8_subject"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:gravity="center_vertical|start"
+                android:maxLines="1"
+                android:text=""
+                android:textColor="@color/widget_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_p8_room"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text=""
                 android:textColor="@color/widget_text_muted"
                 android:textSize="11sp" />
         </LinearLayout>

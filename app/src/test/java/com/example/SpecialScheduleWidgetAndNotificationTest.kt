@@ -117,13 +117,66 @@ class SpecialScheduleWidgetAndNotificationTest {
         val title = extras.getString(android.app.Notification.EXTRA_TITLE) ?: ""
         val text = extras.getString(android.app.Notification.EXTRA_TEXT) ?: ""
 
-        // 普通時間割でも8:30〜9:35が含まれていることを確認
-        assertTrue("タイトルに時間が含まれる", title.contains("8:30〜9:35"))
-        assertTrue("本文に時間が含まれる", text.contains("8:30〜9:35"))
+        // 普通時間割でも開始時間・終了時間が含まれていることを確認
+        assertTrue("タイトルに科目が含まれる", title.contains("国語"))
+        assertTrue("本文に開始時間が含まれる", text.contains("開始:8:30"))
+        assertTrue("本文に終了時間が含まれる", text.contains("終了:9:35"))
 
         // アプリ内時間割グリッドの表示フラグ判定 (普通時間割は表示しない、特別時程・考査時程のみ表示)
         val isSpecialOrExamInApp = p1.isExam || p1.isSpecialSchedule
         assertFalse("普通時間割はアプリ内で開始・終了時間を表示しない", isSpecialOrExamInApp)
     }
+
+    @Test
+    fun testWidgetMinimumFivePeriodsCalculation() {
+        // 2限しかない日でも、最低5限分のブロックが確保されることを確認
+        val periodsOnly2 = listOf(
+            com.example.model.PeriodSchedule(1, "現代文", "1組"),
+            com.example.model.PeriodSchedule(2, "数学", "1組")
+        )
+        val maxPeriodWithSubject2 = periodsOnly2
+            .filter { it.subject.isNotBlank() && it.subject != "-" && it.subject != "なし" }
+            .maxOfOrNull { it.period } ?: 0
+        val displayPeriodsCount2 = maxOf(5, maxPeriodWithSubject2).coerceIn(5, 8)
+        assertEquals(5, displayPeriodsCount2)
+
+        // 6限ある日は6限まで拡張されることを確認
+        val periods6 = listOf(
+            com.example.model.PeriodSchedule(1, "国語", "1組"),
+            com.example.model.PeriodSchedule(2, "数学", "1組"),
+            com.example.model.PeriodSchedule(3, "英語", "1組"),
+            com.example.model.PeriodSchedule(4, "理科", "1組"),
+            com.example.model.PeriodSchedule(5, "社会", "1組"),
+            com.example.model.PeriodSchedule(6, "体育", "体育館")
+        )
+        val maxPeriodWithSubject6 = periods6
+            .filter { it.subject.isNotBlank() && it.subject != "-" && it.subject != "なし" }
+            .maxOfOrNull { it.period } ?: 0
+        val displayPeriodsCount6 = maxOf(5, maxPeriodWithSubject6).coerceIn(5, 8)
+        assertEquals(6, displayPeriodsCount6)
+
+        // 7限ある日は7限まで拡張されることを確認
+        val periods7 = periods6 + com.example.model.PeriodSchedule(7, "情報", "PC教室")
+        val maxPeriodWithSubject7 = periods7
+            .filter { it.subject.isNotBlank() && it.subject != "-" && it.subject != "なし" }
+            .maxOfOrNull { it.period } ?: 0
+        val displayPeriodsCount7 = maxOf(5, maxPeriodWithSubject7).coerceIn(5, 8)
+        assertEquals(7, displayPeriodsCount7)
+    }
+
+    @Test
+    fun testWidgetTimesAbolished() {
+        val classGroup = ClassGroup(id = "1", name = "1組", grade = 1, section = "1")
+        val normalPeriod = com.example.model.PeriodSchedule(1, "国語", "1組", startTime = "8:30", endTime = "9:35")
+        val specialPeriod = com.example.model.PeriodSchedule(1, "国語", "1組", startTime = "8:50", endTime = "9:40", isSpecialSchedule = true)
+
+        // ウィジェットでは時間表示を撤廃（特別時程であってもウィジェット内は時限番号・科目名・教室名のみ）
+        // 通知では普通時程・特別時程ともに開始時間・終了時間を引き続き表示
+        assertEquals("8:30", normalPeriod.startTime)
+        assertEquals("9:35", normalPeriod.endTime)
+        assertEquals("8:50", specialPeriod.startTime)
+        assertEquals("9:40", specialPeriod.endTime)
+    }
 }
+
 

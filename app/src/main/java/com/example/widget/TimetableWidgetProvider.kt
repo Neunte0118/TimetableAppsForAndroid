@@ -359,131 +359,78 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                     R.id.widget_p2_container,
                     R.id.widget_p3_container,
                     R.id.widget_p4_container,
-                    R.id.widget_p5_container
+                    R.id.widget_p5_container,
+                    R.id.widget_p6_container,
+                    R.id.widget_p7_container,
+                    R.id.widget_p8_container
                 )
                 val periodNums = listOf(
                     R.id.widget_p1_num,
                     R.id.widget_p2_num,
                     R.id.widget_p3_num,
                     R.id.widget_p4_num,
-                    R.id.widget_p5_num
+                    R.id.widget_p5_num,
+                    R.id.widget_p6_num,
+                    R.id.widget_p7_num,
+                    R.id.widget_p8_num
                 )
                 val periodSubjects = listOf(
                     R.id.widget_p1_subject,
                     R.id.widget_p2_subject,
                     R.id.widget_p3_subject,
                     R.id.widget_p4_subject,
-                    R.id.widget_p5_subject
+                    R.id.widget_p5_subject,
+                    R.id.widget_p6_subject,
+                    R.id.widget_p7_subject,
+                    R.id.widget_p8_subject
                 )
                 val periodRooms = listOf(
                     R.id.widget_p1_room,
                     R.id.widget_p2_room,
                     R.id.widget_p3_room,
                     R.id.widget_p4_room,
-                    R.id.widget_p5_room
-                )
-                val periodTimes = listOf(
-                    R.id.widget_p1_time,
-                    R.id.widget_p2_time,
-                    R.id.widget_p3_time,
-                    R.id.widget_p4_time,
-                    R.id.widget_p5_time
-                )
-                val periodStartTimes = listOf(
-                    R.id.widget_p1_start_time,
-                    R.id.widget_p2_start_time,
-                    R.id.widget_p3_start_time,
-                    R.id.widget_p4_start_time,
-                    R.id.widget_p5_start_time
-                )
-                val periodEndTimes = listOf(
-                    R.id.widget_p1_end_time,
-                    R.id.widget_p2_end_time,
-                    R.id.widget_p3_end_time,
-                    R.id.widget_p4_end_time,
-                    R.id.widget_p5_end_time
+                    R.id.widget_p5_room,
+                    R.id.widget_p6_room,
+                    R.id.widget_p7_room,
+                    R.id.widget_p8_room
                 )
 
-                val lastPeriodWithSubject = (1..5).indexOfLast { p ->
-                    val cell = schedule.periods.find { it.period == p }
-                    hasValidSubject(cell?.subject)
-                } + 1
+                val hasAnySubject = schedule.periods.any { hasValidSubject(it.subject) }
+                val maxPeriodWithSubject = schedule.periods
+                    .filter { hasValidSubject(it.subject) }
+                    .maxOfOrNull { it.period } ?: 0
 
                 val isColorEnabled = repo.isSubjectColorEnabled.value
                 val colorGroups = repo.subjectColorGroups.value
                 val defaultSubjectColor = context.getColor(R.color.widget_text_primary)
-                val isDateSpecialOrExam = repo.csvSyncManager.isExamOrSpecialDate(targetDate)
 
-                if (lastPeriodWithSubject == 0) {
+                if (!hasAnySubject) {
                     views.setViewVisibility(R.id.widget_periods_container, View.GONE)
                     views.setViewVisibility(R.id.widget_no_timetable_container, View.VISIBLE)
                 } else {
                     views.setViewVisibility(R.id.widget_no_timetable_container, View.GONE)
                     views.setViewVisibility(R.id.widget_periods_container, View.VISIBLE)
 
-                    for (i in 0 until 5) {
+                    // 基本5限分のブロックを確保。それ未満の場合は空のブロックを表示して1授業が巨大化するのを防止。
+                    // 6限以上ある場合はその時限数に応じて拡張。
+                    val displayPeriodsCount = maxOf(5, maxPeriodWithSubject)
+                        .coerceIn(5, periodContainers.size)
+
+                    for (i in periodContainers.indices) {
                         val periodNum = i + 1
-                        if (periodNum > lastPeriodWithSubject) {
+                        if (periodNum > displayPeriodsCount) {
                             views.setViewVisibility(periodContainers[i], View.GONE)
                         } else {
                             views.setViewVisibility(periodContainers[i], View.VISIBLE)
-                            val cell = schedule.periods.find { it.period == periodNum } ?: schedule.periods.getOrNull(i)
+                            val cell = schedule.periods.find { it.period == periodNum }
 
                             views.setTextViewText(periodNums[i], "$periodNum")
-                            if (hasValidSubject(cell?.subject)) {
-                                val subjectName = cell!!.subject.trim()
+                            if (cell != null && hasValidSubject(cell.subject)) {
+                                val subjectName = cell.subject.trim()
                                 views.setTextViewText(periodSubjects[i], subjectName)
 
                                 val roomText = cell.classroom.ifBlank { "" }
                                 views.setTextViewText(periodRooms[i], roomText)
-
-                                val isSpecialOrExam = cell.isSpecialSchedule || cell.isExam || isDateSpecialOrExam
-
-                                if (isSpecialOrExam) {
-                                    val sTime = cell.startTime.trim()
-                                    val eTime = cell.endTime.trim()
-
-                                    if (sTime.isNotBlank()) {
-                                        views.setTextViewText(periodStartTimes[i], sTime)
-                                        views.setViewVisibility(periodStartTimes[i], View.VISIBLE)
-                                    } else {
-                                        views.setViewVisibility(periodStartTimes[i], View.GONE)
-                                    }
-
-                                    if (eTime.isNotBlank()) {
-                                        views.setTextViewText(periodEndTimes[i], eTime)
-                                        views.setViewVisibility(periodEndTimes[i], View.VISIBLE)
-                                    } else {
-                                        views.setViewVisibility(periodEndTimes[i], View.GONE)
-                                    }
-
-                                    val timeColor = if (cell.isExam) {
-                                        context.getColor(R.color.widget_exam_time_text)
-                                    } else {
-                                        context.getColor(R.color.widget_special_time_text)
-                                    }
-                                    views.setTextColor(periodStartTimes[i], timeColor)
-                                    views.setTextColor(periodEndTimes[i], timeColor)
-
-                                    // 特別時程および考査時程は科目の上下に時間が出るため左側時間を非表示
-                                    views.setViewVisibility(periodTimes[i], View.GONE)
-                                } else {
-                                    views.setViewVisibility(periodStartTimes[i], View.GONE)
-                                    views.setViewVisibility(periodEndTimes[i], View.GONE)
-
-                                    val standardTimes = com.example.model.StandardPeriodTimes.getTimes(periodNum)
-                                    val timeText = if (cell.startTime.isNotBlank() && cell.endTime.isNotBlank()) {
-                                        "${cell.startTime}-${cell.endTime}"
-                                    } else if (cell.startTime.isNotBlank()) {
-                                        cell.startTime
-                                    } else if (standardTimes != null) {
-                                        "${standardTimes.first}-${standardTimes.second}"
-                                    } else {
-                                        ""
-                                    }
-                                    views.setTextViewText(periodTimes[i], timeText)
-                                    views.setViewVisibility(periodTimes[i], if (timeText.isNotBlank()) View.VISIBLE else View.GONE)
-                                }
 
                                 val defaultRoomColor = context.getColor(R.color.widget_text_muted)
                                 val examRoomColor = context.getColor(R.color.widget_text_exam_room)
@@ -505,23 +452,21 @@ class TimetableWidgetProvider : AppWidgetProvider() {
                                     views.setTextColor(periodSubjects[i], defaultSubjectColor)
                                     views.setTextColor(periodRooms[i], defaultRoomColor)
                                 }
+
+                                val bgRes = when {
+                                    cell.isUnselectedElective -> R.drawable.widget_period_cell_unselected_bg
+                                    cell.isExam -> R.drawable.widget_period_cell_exam_bg
+                                    repo.isHighlightChangedPeriods.value && cell.isChanged -> R.drawable.widget_period_cell_changed_bg
+                                    else -> R.drawable.widget_period_cell_bg
+                                }
+                                views.setInt(periodContainers[i], "setBackgroundResource", bgRes)
                             } else {
-                                views.setTextViewText(periodSubjects[i], "-")
+                                // 空のブロック（2限しかない日でも1授業が巨大化しないよう、5限分まで空ブロックを配置）
+                                views.setTextViewText(periodSubjects[i], "")
                                 views.setTextColor(periodSubjects[i], defaultSubjectColor)
                                 views.setTextViewText(periodRooms[i], "")
-                                views.setTextViewText(periodTimes[i], "")
-                                views.setViewVisibility(periodTimes[i], View.GONE)
-                                views.setViewVisibility(periodStartTimes[i], View.GONE)
-                                views.setViewVisibility(periodEndTimes[i], View.GONE)
+                                views.setInt(periodContainers[i], "setBackgroundResource", R.drawable.widget_period_cell_bg)
                             }
-
-                            val bgRes = when {
-                                cell?.isUnselectedElective == true -> R.drawable.widget_period_cell_unselected_bg
-                                cell?.isExam == true -> R.drawable.widget_period_cell_exam_bg
-                                repo.isHighlightChangedPeriods.value && cell?.isChanged == true -> R.drawable.widget_period_cell_changed_bg
-                                else -> R.drawable.widget_period_cell_bg
-                            }
-                            views.setInt(periodContainers[i], "setBackgroundResource", bgRes)
                         }
                     }
                 }

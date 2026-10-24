@@ -47,7 +47,9 @@ object NotificationHelper {
         PeriodTime(2, 9, 45, 10, 50),
         PeriodTime(3, 11, 0, 12, 5),
         PeriodTime(4, 12, 55, 14, 0),
-        PeriodTime(5, 14, 10, 15, 15)
+        PeriodTime(5, 14, 10, 15, 15),
+        PeriodTime(6, 15, 25, 16, 30),
+        PeriodTime(7, 16, 40, 17, 45)
     )
 
     fun createNotificationChannel(context: Context) {
