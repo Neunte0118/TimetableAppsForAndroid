@@ -429,7 +429,7 @@ class ExamScheduleCsvTest {
 
     @Test
     fun testAppVersion_is132() {
-        assertEquals("1.4.5", com.example.BuildConfig.VERSION_NAME)
+        assertEquals("1.4.7", com.example.BuildConfig.VERSION_NAME)
         assertEquals(4, com.example.BuildConfig.VERSION_CODE)
     }
 }
