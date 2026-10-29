@@ -261,24 +261,30 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        // Live Clock updates every second
+        // Live Clock updates every second and detects midnight day transition
         viewModelScope.launch {
             val formatter = DateTimeFormatter.ofPattern("M月d日(E) HH:mm", Locale.JAPANESE)
             while (true) {
                 val now = LocalDateTime.now()
+                val prevDate = _uiState.value.currentDate
                 _uiState.update {
                     it.copy(
                         currentDate = now.toLocalDate(),
                         liveTimeString = now.format(formatter)
                     )
                 }
+                if (now.toLocalDate() != prevDate) {
+                    // Date changed (midnight transition): re-sync daily CSVs (e.g. changed timetable)
+                    repository.syncCsvData(force = false)
+                    refreshSchedules()
+                }
                 delay(1000)
             }
         }
 
-        // Sync CSV at start
+        // Sync CSV at start (respects daily / weekly intervals)
         viewModelScope.launch {
-            repository.syncCsvData()
+            repository.syncCsvData(force = false)
         }
 
         checkForAppUpdate()
@@ -700,7 +706,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         refreshSchedules()
     }
 
-    fun syncCsvData(force: Boolean = false) {
+    fun syncCsvData(force: Boolean = true) {
         viewModelScope.launch {
             val result = repository.syncCsvData(force)
             val selectedClass = _uiState.value.selectedClass

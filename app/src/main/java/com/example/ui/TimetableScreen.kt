@@ -128,7 +128,7 @@ fun TimetableScreen(
 
                     // Quick Sync / CSV button
                     IconButton(
-                        onClick = { viewModel.syncCsvData() },
+                        onClick = { viewModel.syncCsvData(force = true) },
                         modifier = Modifier.testTag("quick_sync_button")
                     ) {
                         if (uiState.csvSyncStatus.isSyncing) {
@@ -318,7 +318,7 @@ fun TimetableScreen(
                 className = uiState.selectedClass.name,
                 isSyncing = uiState.csvSyncStatus.isSyncing,
                 syncMessage = uiState.csvSyncStatus.lastSyncMessage,
-                onRetry = { viewModel.syncCsvData() },
+                onRetry = { viewModel.syncCsvData(force = true) },
                 onSkip = { viewModel.proceedToElectivesFromLoading() }
             )
         }
@@ -431,7 +431,7 @@ fun TimetableScreen(
             syncStatus = uiState.csvSyncStatus,
             onSaveAndSync = { config ->
                 viewModel.saveCsvUrls(config)
-                viewModel.syncCsvData()
+                viewModel.syncCsvData(force = true)
             },
             onResetToDefaultUrls = { viewModel.resetToDefaultCsvUrls() },
             onClearAllCache = { viewModel.clearAllCsvCache() },

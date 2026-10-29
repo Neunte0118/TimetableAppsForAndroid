@@ -4,6 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.data.TimetableRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class DailyTimetableReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -27,6 +30,14 @@ class DailyTimetableReceiver : BroadcastReceiver() {
             com.example.widget.TimetableWidgetProvider.updateAllWidgets(context)
             com.example.widget.EventMemoWidgetProvider.updateAllWidgets(context)
         } catch (_: Exception) {
+        }
+
+        // Trigger daily CSV sync (including changed timetable)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                repo.syncCsvData(force = false)
+            } catch (_: Exception) {
+            }
         }
     }
 }

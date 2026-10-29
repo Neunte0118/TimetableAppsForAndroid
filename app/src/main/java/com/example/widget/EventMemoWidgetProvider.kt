@@ -95,7 +95,7 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                             android.widget.Toast.makeText(context, "時間割・行事・メモを更新中...", android.widget.Toast.LENGTH_SHORT).show()
                         }
                         val repo = TimetableRepository.getInstance(context)
-                        repo.syncCsvData()
+                        repo.syncCsvData(force = true)
                         withContext(Dispatchers.Main) {
                             android.widget.Toast.makeText(context, "更新が完了しました", android.widget.Toast.LENGTH_SHORT).show()
                         }
@@ -120,6 +120,14 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                 editor.apply()
                 updateAllWidgets(context)
                 scheduleAlarms(context)
+                // 日付変更時に日次CSV（時間割変更届等）をバックグラウンド取得
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val repo = TimetableRepository.getInstance(context)
+                        repo.syncCsvData(force = false)
+                    } catch (_: Exception) {
+                    }
+                }
             }
             ACTION_EM_AFTERNOON_UPDATE,
             Intent.ACTION_TIME_CHANGED,
