@@ -185,6 +185,30 @@ class CsvSyncManager(private val context: Context) {
             savedSecondTerm
         }
 
+        val isLegacyTimetableChange = savedTimetableChangeSheet != null &&
+            (savedTimetableChangeSheet.contains("2PACX-1vQiStJ") || savedTimetableChangeSheet.contains("gid=1149682638"))
+        val effectiveTimetableChange = if (isLegacyTimetableChange || savedTimetableChangeSheet.isNullOrBlank()) {
+            prefs.edit()
+                .putString("url_timetable_change_sheet", defaultConfig.timetableChangeSheetUrl)
+                .remove("csv_cache_timetable_changes")
+                .apply()
+            defaultConfig.timetableChangeSheetUrl
+        } else {
+            savedTimetableChangeSheet
+        }
+
+        val isLegacyCourseChange = savedCourseChangeSheet != null &&
+            (savedCourseChangeSheet.contains("2PACX-1vQiStJ") || savedCourseChangeSheet.contains("gid=1592703701"))
+        val effectiveCourseChange = if (isLegacyCourseChange || savedCourseChangeSheet.isNullOrBlank()) {
+            prefs.edit()
+                .putString("url_course_change_sheet", defaultConfig.courseChangeSheetUrl)
+                .remove("csv_cache_course_changes")
+                .apply()
+            defaultConfig.courseChangeSheetUrl
+        } else {
+            savedCourseChangeSheet
+        }
+
         return CsvUrlsConfig(
             commonScheduleUrl = savedCommon ?: defaultConfig.commonScheduleUrl,
             basicClassUrl = savedBasic ?: defaultConfig.basicClassUrl,
@@ -192,8 +216,8 @@ class CsvSyncManager(private val context: Context) {
             updatesUrl = effectiveUpdates,
             eventsUrl = savedEvents ?: defaultConfig.eventsUrl,
             holidaysUrl = savedHolidays ?: defaultConfig.holidaysUrl,
-            timetableChangeSheetUrl = savedTimetableChangeSheet ?: defaultConfig.timetableChangeSheetUrl,
-            courseChangeSheetUrl = savedCourseChangeSheet ?: defaultConfig.courseChangeSheetUrl,
+            timetableChangeSheetUrl = effectiveTimetableChange,
+            courseChangeSheetUrl = effectiveCourseChange,
             examScheduleUrl = effectiveExamSchedule,
             subjectMappingUrl = effectiveSubjectMapping,
             specialScheduleUrl = effectiveSpecial,
@@ -1347,7 +1371,8 @@ class CsvSyncManager(private val context: Context) {
         val d = date.dayOfMonth
         val maxSpecial = specialSchedulesByDate[m to d]?.maxOfOrNull { it.period } ?: 5
         val maxExam = examSchedulesByDate[m to d]?.maxOfOrNull { it.period } ?: 5
-        return maxOf(5, maxSpecial, maxExam)
+        val maxChange = timetableChangesByDate[m to d]?.maxOfOrNull { it.period } ?: 5
+        return maxOf(5, maxSpecial, maxExam, maxChange)
     }
 
     private fun getDayOfWeekJp(dow: DayOfWeek): String {

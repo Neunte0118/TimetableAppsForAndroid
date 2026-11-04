@@ -404,25 +404,25 @@ object CsvParser {
 
         for (i in startIdx until rows.size) {
             val row = rows[i]
-            if (row.size < 4) continue
+            if (row.size < 3) continue
             val dateStr = CsvNormalizer.normalizeDate(row[0].trim())
+            if (dateStr.isBlank()) continue
             val (m, d) = parseMonthDay(dateStr) ?: continue
             val classId = CsvNormalizer.normalizeClassId(row[1].trim())
             val period = CsvNormalizer.normalizePeriod(row[2].trim())
-            val subject = CsvNormalizer.normalizeSubject(row[3].trim())
+            val rawSubject = if (row.size >= 4) row[3].trim() else ""
+            val subject = CsvNormalizer.normalizeSubject(rawSubject)
 
-            if (subject.isNotBlank()) {
-                list.add(
-                    TimetableChangeNotificationRow(
-                        dateStr = dateStr,
-                        month = m,
-                        day = d,
-                        classId = classId,
-                        period = period,
-                        subject = subject
-                    )
+            list.add(
+                TimetableChangeNotificationRow(
+                    dateStr = dateStr,
+                    month = m,
+                    day = d,
+                    classId = classId,
+                    period = period,
+                    subject = subject
                 )
-            }
+            )
         }
         return list
     }

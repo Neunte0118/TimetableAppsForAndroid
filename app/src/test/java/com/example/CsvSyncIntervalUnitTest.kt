@@ -151,4 +151,58 @@ class CsvSyncIntervalUnitTest {
             assertTrue("Expected $cacheKey to be re-fetched when force = true", shouldFetchForced)
         }
     }
+
+    @Test
+    fun testTimetableChangeUrlMigration() {
+        val prefs = context.getSharedPreferences("csv_sync_prefs", Context.MODE_PRIVATE)
+        // 過去の古い時間割変更シートURL（gid=1149682638）が保存されている状態をシミュレート
+        prefs.edit()
+            .putString("url_timetable_change_sheet", "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiStJCsPKp1ndi958BLOajBqizE_aIcO2Z0f9hPgiyPV19rnWB3qVcrLuVEaeCeE5ddaIudtX7VkzE/pub?gid=1149682638&single=true&output=csv")
+            .putString("csv_cache_timetable_changes", "old_cached_data")
+            .apply()
+
+        // 新しくインスタンス化するとマイグレーションが走り、新デフォルト（gid=963151426）に自動更新され旧キャッシュが消去される
+        val newManager = CsvSyncManager(context)
+        val config = newManager.urlsConfig.value
+        assertTrue("Expected new timetable change URL with gid=963151426", config.timetableChangeSheetUrl.contains("gid=963151426"))
+        assertFalse("Legacy cache should be removed", prefs.contains("csv_cache_timetable_changes"))
+    }
+
+    @Test
+    fun testTimetableChangeAppliedCorrectly() {
+        val testCsv = """
+            dates,classes,periods,subjects
+            10月29日,5,2,英語W
+            10月29日,5,4,E2
+            10月30日,2,1,英語R
+            11月13日,5,4,現代文
+            7月1日,1,6,A1
+        """.trimIndent()
+
+        val parsed = com.example.data.csv.CsvParser.parseTimetableChanges(testCsv)
+        org.junit.Assert.assertEquals(5, parsed.size)
+
+        val prefs = context.getSharedPreferences("csv_sync_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("csv_cache_timetable_changes", testCsv).apply()
+        syncManager.loadAndParseLocalData()
+
+        val classGroup5 = com.example.model.ClassGroup(id = "5", name = "5組", grade = 1, section = "5")
+        val dateOct29 = java.time.LocalDate.of(2026, 10, 29)
+
+        val period2 = syncManager.resolvePeriodSchedule(classGroup5, dateOct29, 2)
+        assertTrue(period2.isChanged)
+        org.junit.Assert.assertEquals("英語W", period2.subject)
+
+        val period4 = syncManager.resolvePeriodSchedule(classGroup5, dateOct29, 4)
+        assertTrue(period4.isChanged)
+        org.junit.Assert.assertEquals("E2", period4.subject)
+
+        // 7月1日 1組の6限（最大時限数が6限になること）
+        val dateJuly1 = java.time.LocalDate.of(2026, 7, 1)
+        org.junit.Assert.assertEquals(6, syncManager.getMaxPeriodsForDate(dateJuly1))
+        val classGroup1 = com.example.model.ClassGroup(id = "1", name = "1組", grade = 1, section = "1")
+        val period6 = syncManager.resolvePeriodSchedule(classGroup1, dateJuly1, 6)
+        assertTrue(period6.isChanged)
+        org.junit.Assert.assertEquals("A1", period6.subject)
+    }
 }
