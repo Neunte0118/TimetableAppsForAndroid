@@ -31,6 +31,10 @@ import androidx.compose.ui.unit.sp
 import com.example.model.TimetableViewMode
 import com.example.ui.components.TimetableTable
 import com.example.ui.dialogs.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -673,6 +677,7 @@ fun ModeSwitchAndDateBar(
  * - Events are non-editable (Read-only from CSV)
  * - Memos are fully editable by the user
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SelectedDayEventMemoSection(
     selectedDate: LocalDate,
@@ -682,6 +687,7 @@ fun SelectedDayEventMemoSection(
     minMemoLines: Int = 2,
     onSaveMemo: (String) -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
     val dateFormatted = remember(selectedDate) {
         selectedDate.format(DateTimeFormatter.ofPattern("M月d日 (E)", Locale.JAPANESE))
     }
@@ -770,7 +776,18 @@ fun SelectedDayEventMemoSection(
                     shape = RoundedCornerShape(8.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .combinedClickable(
+                            onClick = { /* no-op */ },
+                            onLongClick = {
+                                val text = eventText.trim()
+                                if (text.isNotBlank() && text != "行事はありません" && text != "なし") {
+                                    clipboardManager.setText(AnnotatedString(text))
+                                }
+                            }
+                        )
                 ) {
                     Text(
                         text = if (eventText.isNotBlank()) eventText else "行事はありません",

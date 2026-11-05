@@ -113,4 +113,56 @@ class AppUpdateCheckUnitTest {
         assertTrue(newInfo.isNewerThan("1.0.0"))
         assertTrue(newInfo.isNewerThan("1.0"))
     }
+
+    @Test
+    fun parseAppUpdateInfo_withBlankLink_generatesLatestUrlAutomatically() {
+        val csv = """
+            ver,info,link
+            1.4.0,・新機能の追加,
+        """.trimIndent()
+
+        val result = CsvParser.parseAppUpdateInfo(csv)
+        assertNotNull(result)
+        assertEquals("1.4.0", result?.version)
+        assertEquals("・新機能の追加", result?.info)
+        assertEquals(
+            "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.4.0/timetable-app-v1.4.0.apk",
+            result?.link
+        )
+    }
+
+    @Test
+    fun parseAppUpdateInfo_withOldVersionUrl_updatesToLatestVersionUrl() {
+        val csv = """
+            ver,info,link
+            1.4.0,・新機能の追加,https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.3.1/timetable-app-v1.3.1.apk
+        """.trimIndent()
+
+        val result = CsvParser.parseAppUpdateInfo(csv)
+        assertNotNull(result)
+        assertEquals("1.4.0", result?.version)
+        assertEquals(
+            "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.4.0/timetable-app-v1.4.0.apk",
+            result?.link
+        )
+    }
+
+    @Test
+    fun appUpdateInfo_buildDownloadUrl_handlesVariousFormats() {
+        // Without v prefix
+        assertEquals(
+            "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.5.0/timetable-app-v1.5.0.apk",
+            AppUpdateInfo.buildDownloadUrl("1.5.0")
+        )
+        // With v prefix
+        assertEquals(
+            "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.5.0/timetable-app-v1.5.0.apk",
+            AppUpdateInfo.buildDownloadUrl("v1.5.0")
+        )
+        // With Ver prefix
+        assertEquals(
+            "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.5.0/timetable-app-v1.5.0.apk",
+            AppUpdateInfo.buildDownloadUrl("Ver 1.5.0")
+        )
+    }
 }

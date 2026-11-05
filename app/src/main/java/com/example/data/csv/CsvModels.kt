@@ -62,8 +62,11 @@ data class UpdateHistoryRow(
 data class AppUpdateInfo(
     val version: String,
     val info: String,
-    val link: String
+    val link: String = ""
 ) {
+    val effectiveLink: String
+        get() = buildDownloadUrl(version, link)
+
     /**
      * この更新情報のバージョンが現在のアプリバージョン (currentVersion) よりも新しいかを判定する
      */
@@ -73,6 +76,38 @@ data class AppUpdateInfo(
 
     companion object {
         /**
+         * バージョン番号から最新のAPKダウンロードURLを自動取得・生成する
+         * バージョン番号のみが異なる GitHub Releases 形式に対応
+         */
+        fun buildDownloadUrl(version: String, baseLink: String? = null): String {
+            val cleanVer = version.trim()
+                .replace(Regex("""^(version|ver|v)\s*""", RegexOption.IGNORE_CASE), "")
+                .trim()
+            val trimmedBase = baseLink?.trim() ?: ""
+
+            if (trimmedBase.isBlank()) {
+                return if (cleanVer.isNotBlank()) {
+                    "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v$cleanVer/timetable-app-v$cleanVer.apk"
+                } else ""
+            }
+
+            // 本アプリのリポジトリの GitHub Releases URL、または /releases/download/ 形式のURL
+            if (trimmedBase.contains("github.com/Neunte0118/TimetableAppsForAndroid/releases") ||
+                trimmedBase.contains("/releases/download/")) {
+                return "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v$cleanVer/timetable-app-v$cleanVer.apk"
+            }
+
+            // ベースURL内にバージョン番号パターン（v1.2.3や1.2.3など）が含まれる場合、最新バージョンで自動置換
+            val versionPattern = Regex("""v?\d+(\.\d+)+""")
+            if (cleanVer.isNotBlank() && versionPattern.containsMatchIn(trimmedBase)) {
+                return trimmedBase.replace(versionPattern) { match ->
+                    if (match.value.startsWith("v", ignoreCase = true)) "v$cleanVer" else cleanVer
+                }
+            }
+
+            return trimmedBase
+        }
+        /**
          * latest が current よりも新しいバージョンであるかをセマンティック比較する
          * - "v1.0.0", "ver 1.0" などのプレフィックスに対応
          * - "1.0" と "1.0.0" などの欠損桁は 0 埋めして同一バージョンとして比較
@@ -80,12 +115,10 @@ data class AppUpdateInfo(
          */
         fun isNewerVersion(latest: String, current: String): Boolean {
             val cleanLatest = latest.trim()
-                .removePrefix("v").removePrefix("V")
-                .removePrefix("ver").removePrefix("Ver")
+                .replace(Regex("""^(version|ver|v)\s*""", RegexOption.IGNORE_CASE), "")
                 .trim()
             val cleanCurrent = current.trim()
-                .removePrefix("v").removePrefix("V")
-                .removePrefix("ver").removePrefix("Ver")
+                .replace(Regex("""^(version|ver|v)\s*""", RegexOption.IGNORE_CASE), "")
                 .trim()
 
             if (cleanLatest.isEmpty()) return false

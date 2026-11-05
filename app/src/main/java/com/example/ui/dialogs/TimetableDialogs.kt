@@ -1,4 +1,8 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@file:OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class
+)
 
 package com.example.ui.dialogs
 
@@ -7,6 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -30,7 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -1371,6 +1378,7 @@ fun AllEventsDialog(
     onSelectDate: (LocalDate) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
     var searchQuery by remember { mutableStateOf("") }
 
     val filteredList = remember(eventsList, searchQuery) {
@@ -1452,10 +1460,18 @@ fun AllEventsDialog(
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        onSelectDate(item.date)
-                                        onDismiss()
-                                    },
+                                    .combinedClickable(
+                                        onClick = {
+                                            onSelectDate(item.date)
+                                            onDismiss()
+                                        },
+                                        onLongClick = {
+                                            val text = item.title.trim()
+                                            if (text.isNotBlank()) {
+                                                clipboardManager.setText(AnnotatedString(text))
+                                            }
+                                        }
+                                    ),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
@@ -3138,9 +3154,10 @@ fun AppUpdateModalDialog(
                     }
                 }
 
-                if (updateInfo.link.isNotBlank()) {
+                val downloadLink = updateInfo.effectiveLink.ifBlank { updateInfo.link }
+                if (downloadLink.isNotBlank()) {
                     Button(
-                        onClick = { onDownloadClick(updateInfo.link) },
+                        onClick = { onDownloadClick(downloadLink) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("download_apk_button"),

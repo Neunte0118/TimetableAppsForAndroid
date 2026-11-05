@@ -17,6 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.model.SearchResultItem
@@ -170,11 +174,13 @@ fun SearchDialog(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SearchResultCard(
     item: SearchResultItem,
     onClick: () -> Unit
 ) {
+    val clipboardManager = LocalClipboardManager.current
     val (typeColor, typeIcon) = when (item.type) {
         SearchResultType.EVENT -> Pair(Color(0xFFE65100), Icons.Default.Event)
         SearchResultType.MEMO -> Pair(Color(0xFF00897B), Icons.Default.EditNote)
@@ -184,7 +190,20 @@ private fun SearchResultCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    val textToCopy = if (item.snippet.isNotBlank() && item.snippet != item.title) {
+                        "${item.title} (${item.snippet})"
+                    } else {
+                        item.title
+                    }
+                    if (textToCopy.isNotBlank()) {
+                        clipboardManager.setText(AnnotatedString(textToCopy))
+                    }
+                }
+            ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

@@ -25,9 +25,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 
 /**
  * Clean & modern timetable grid component.
@@ -37,7 +41,9 @@ import androidx.compose.ui.graphics.toArgb
  * - Highlight cells with timetable changes (isChanged) with high-contrast in both light & dark themes.
  * - Read-only cells.
  * - Shows only Subject in TIMETABLE mode, and only Classroom in MOVING_CLASSROOM mode.
+ * - Long click on column header or period cell copies the day's timetable (e.g. "数学, 英語, ...") to clipboard without toasts.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TimetableTable(
     daySchedules: List<DaySchedule>,
@@ -56,6 +62,18 @@ fun TimetableTable(
     cellHeight: androidx.compose.ui.unit.Dp = 48.dp
 ) {
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val clipboardManager = LocalClipboardManager.current
+
+    val copyColumnTimetable: (DaySchedule) -> Unit = { schedule ->
+        val subjectsText = schedule.periods
+            .sortedBy { it.period }
+            .map { it.subject.trim() }
+            .filter { it.isNotBlank() }
+            .joinToString(", ")
+        if (subjectsText.isNotBlank()) {
+            clipboardManager.setText(AnnotatedString(subjectsText))
+        }
+    }
 
     Card(
         modifier = modifier
@@ -172,7 +190,10 @@ fun TimetableTable(
                                     Modifier
                                 }
                             )
-                            .clickable { onSelectDate(schedule.date) }
+                            .combinedClickable(
+                                onClick = { onSelectDate(schedule.date) },
+                                onLongClick = { copyColumnTimetable(schedule) }
+                            )
                             .padding(vertical = 2.dp, horizontal = 1.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
@@ -252,7 +273,10 @@ fun TimetableTable(
                                     Modifier
                                 }
                             )
-                            .clickable { onSelectDate(schedule.date) }
+                            .combinedClickable(
+                                onClick = { onSelectDate(schedule.date) },
+                                onLongClick = { copyColumnTimetable(schedule) }
+                            )
                             .padding(if (isSelectedCol) 1.5.dp else 0.dp)
                     ) {
                         Column(
@@ -397,6 +421,11 @@ fun TimetableTable(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(cellHeight)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .combinedClickable(
+                                            onClick = { onSelectDate(schedule.date) },
+                                            onLongClick = { copyColumnTimetable(schedule) }
+                                        )
                                         .testTag("cell_${schedule.date}_$period")
                                 ) {
                                     Box(

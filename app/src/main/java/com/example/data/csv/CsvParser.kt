@@ -379,12 +379,13 @@ object CsvParser {
             if (row.isEmpty()) continue
             val version = row[0].trim()
             val info = row.getOrNull(1)?.trim() ?: ""
-            val link = row.getOrNull(2)?.trim() ?: ""
+            val rawLink = row.getOrNull(2)?.trim() ?: ""
             if (version.isNotBlank()) {
+                val resolvedLink = AppUpdateInfo.buildDownloadUrl(version, rawLink)
                 return AppUpdateInfo(
                     version = version,
                     info = info,
-                    link = link
+                    link = resolvedLink
                 )
             }
         }

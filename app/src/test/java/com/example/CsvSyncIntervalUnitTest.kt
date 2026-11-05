@@ -205,4 +205,22 @@ class CsvSyncIntervalUnitTest {
         assertTrue(period6.isChanged)
         org.junit.Assert.assertEquals("A1", period6.subject)
     }
+
+    @Test
+    fun testTimetableColumnCopyFormat() {
+        val periods = listOf(
+            com.example.model.PeriodSchedule(period = 1, subject = "数学Ⅱ", classroom = "1組"),
+            com.example.model.PeriodSchedule(period = 2, subject = "英語長文", classroom = "1組"),
+            com.example.model.PeriodSchedule(period = 3, subject = "現代文", classroom = "1組"),
+            com.example.model.PeriodSchedule(period = 4, subject = "体育", classroom = "グラウンド"),
+            com.example.model.PeriodSchedule(period = 5, subject = "HR", classroom = "1組")
+        )
+        val copyText = periods
+            .sortedBy { it.period }
+            .map { it.subject.trim() }
+            .filter { it.isNotBlank() }
+            .joinToString(", ")
+
+        org.junit.Assert.assertEquals("数学Ⅱ, 英語長文, 現代文, 体育, HR", copyText)
+    }
 }

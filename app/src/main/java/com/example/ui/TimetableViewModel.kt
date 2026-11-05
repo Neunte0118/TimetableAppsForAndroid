@@ -982,7 +982,9 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun openUpdateDownloadLink(link: String) {
-        val trimmed = link.trim()
+        val trimmed = link.trim().ifBlank {
+            _uiState.value.pendingAppUpdate?.effectiveLink ?: _uiState.value.pendingAppUpdate?.link ?: ""
+        }
         if (trimmed.isNotBlank()) {
             val fullUrl = if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
                 "https://$trimmed"
