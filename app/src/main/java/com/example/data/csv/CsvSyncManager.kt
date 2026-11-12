@@ -55,6 +55,8 @@ class CsvSyncManager(private val context: Context) {
         const val KEY_TS_COURSE_CHANGES = "sync_ts_course_changes"
         const val KEY_TS_EXAM_SCHEDULE = "sync_ts_exam_schedule"
         const val KEY_TS_SPECIAL_SCHEDULE = "sync_ts_special_schedule"
+
+        val SATURDAY_LECTURE_ORIGINS = listOf("土曜講習①", "土曜講習②", "土曜講習③", "土曜講習④")
     }
 
     // Config & Status Flows
@@ -104,6 +106,8 @@ class CsvSyncManager(private val context: Context) {
     private var holidaysByDate: Map<Pair<Int, Int>, HolidayRow> = emptyMap()
     private var distinctElectiveOrigins: List<String> = emptyList()
 
+
+
     private fun rebuildIndexMaps() {
         examSchedulesByDate = examSchedules.groupBy { it.month to it.day }
         specialSchedulesByDate = specialSchedules.groupBy { it.month to it.day }
@@ -112,7 +116,8 @@ class CsvSyncManager(private val context: Context) {
         courseChangesByDate = courseChanges.groupBy { it.month to it.day }
         eventsByDate = events.groupBy { it.month to it.day }
         holidaysByDate = holidays.associateBy { it.month to it.day }
-        distinctElectiveOrigins = electives.map { it.origin.trim() }.filter { it.isNotBlank() }.distinct()
+        val baseOrigins = electives.map { it.origin.trim() }.filter { it.isNotBlank() }
+        distinctElectiveOrigins = (baseOrigins + SATURDAY_LECTURE_ORIGINS + "土曜講習").distinct()
     }
 
     init {
@@ -697,6 +702,13 @@ class CsvSyncManager(private val context: Context) {
             return true
         }
 
+        // Saturday lecture match (土曜講習① <-> 土講① <-> 土曜講習1 <-> 土講1)
+        val sat1 = normalizeSaturdayLectureName(s1)
+        val sat2 = normalizeSaturdayLectureName(s2)
+        if (sat1.isNotBlank() && sat2.isNotBlank()) {
+            return sat1 == sat2
+        }
+
         // 1) s1 が source で s2 が target
         val target1 = sourceToTargetMap[s1]
         if (target1 != null && target1.equals(s2, ignoreCase = true)) return true
@@ -724,6 +736,53 @@ class CsvSyncManager(private val context: Context) {
         if (sources2 != null && sources2.any { it.equals(s1, ignoreCase = true) }) return true
 
         return false
+    }
+
+    fun normalizeSaturdayLectureName(name: String): String {
+        val s = name.trim()
+        if (!s.startsWith("土曜講習") && !s.startsWith("土講")) return ""
+        val num = s.find { it in '\u2460'..'\u2464' || it in '1'..'4' } ?: return ""
+        val circled = when (num) {
+            '①', '1' -> "①"
+            '②', '2' -> "②"
+            '③', '3' -> "③"
+            '④', '4' -> "④"
+            else -> ""
+        }
+        return if (circled.isNotBlank()) "土曜講習$circled" else ""
+    }
+
+    fun toCircledNumber(n: Int): String {
+        return when (n) {
+            1 -> "①"
+            2 -> "②"
+            3 -> "③"
+            4 -> "④"
+            5 -> "⑤"
+            6 -> "⑥"
+            7 -> "⑦"
+            8 -> "⑧"
+            9 -> "⑨"
+            10 -> "⑩"
+            else -> "$n"
+        }
+    }
+
+    fun isSaturdayLectureSubject(subject: String, period: Int): Boolean {
+        val s = subject.trim()
+        if (s.isBlank()) return false
+        val circled = toCircledNumber(period)
+        if (s == "土曜講習$circled" || s == "土曜講習$period" || s == "土講$circled" || s == "土講$period" ||
+            s == "土曜講習" || s == "土講" || s.startsWith("土曜講習") || s.startsWith("土講")) {
+            return true
+        }
+        return when (period) {
+            1 -> s == "数学D" || s == "数学F" || s.contains("数学D") || s.contains("数学F")
+            2 -> s == "倫理" || s == "数学E" || s.contains("倫理") || s.contains("数学E")
+            3 -> s == "国語A" || s.contains("国語A")
+            4 -> s == "国語B" || s.contains("国語B")
+            else -> false
+        }
     }
 
     private fun compareNaturalOrder(a: String, b: String): Int {
@@ -790,10 +849,13 @@ class CsvSyncManager(private val context: Context) {
                 .filter { it.isNotBlank() }
                 .sortedWith(Comparator { a, b -> compareNaturalOrder(a, b) })
 
-            if (options.isNotEmpty()) {
-                resultMap[originKey] = options.toMutableList()
-            }
         }
+
+        // 4. 土曜講習①〜④の欄を追加（それぞれ指定された選択肢 + 「なし」）
+        resultMap["土曜講習①"] = mutableListOf("数学D", "数学F", "なし")
+        resultMap["土曜講習②"] = mutableListOf("倫理", "数学E", "なし")
+        resultMap["土曜講習③"] = mutableListOf("国語A", "なし")
+        resultMap["土曜講習④"] = mutableListOf("国語B", "なし")
 
         return resultMap
     }
@@ -1107,18 +1169,45 @@ class CsvSyncManager(private val context: Context) {
             isChangedByNotification = true
         }
 
+        // 3.5 Check 土曜講習 (Saturday Lecture Schedule Changes)
+        val isSaturday = (date.dayOfWeek == DayOfWeek.SATURDAY)
+        if (isSaturday && period in 1..4) {
+            val satOrigin = "土曜講習${toCircledNumber(period)}"
+            val hasSaturdayChange = specialRow != null ||
+                matchingTimetableChanges.isNotEmpty() ||
+                matchingCourseChange != null ||
+                (commonSchedulesByDate[month to day]?.periodCodes?.getOrNull(period - 1)?.isNotBlank() == true)
+
+            val checkSubject = resolvedSubject.ifBlank { currentSubject }.trim()
+            val checkOrigin = currentOrigin.trim()
+
+            val isSaturdayLectureSlot = isSaturdayLectureSubject(checkSubject, period) ||
+                isSaturdayLectureSubject(checkOrigin, period) ||
+                (hasSaturdayChange && (checkSubject.isBlank() || checkSubject == "土曜講習" || checkSubject == "土講"))
+
+            if (isSaturdayLectureSlot) {
+                currentOrigin = satOrigin
+                val userChoice = userElectives[satOrigin]?.trim() ?: ""
+                if (userChoice.isNotBlank()) {
+                    resolvedSubject = userChoice
+                }
+            }
+        }
+
         // 4. Resolve classroom from CSV (選択科目 name column)
-        val classroom = resolveClassroom(resolvedSubject, currentOrigin, classGroup)
+        val classroom = if (resolvedSubject == "なし") "" else resolveClassroom(resolvedSubject, currentOrigin, classGroup)
 
         // 共通科目またはHR教室の授業（自教室）は選択コマではなく共通必修のため未選択扱いしない
         val isCommon = isCommonSubject(resolvedSubject, currentOrigin) ||
             classroom.contains("組教室") || classroom == "HR教室" || classroom == "自教室"
 
         // 選択科目のコマだが未選択（自分の選択科目が未指定）かどうかを判定（ユニークなorigin一覧で高速判定）
-        val isElectiveSlot = !isCommon && distinctElectiveOrigins.any { origin ->
+        val isSatOrigin = currentOrigin.startsWith("土曜講習") || currentOrigin.startsWith("土講")
+        val isElectiveSlot = !isCommon && (isSatOrigin || distinctElectiveOrigins.any { origin ->
             isSubjectMatch(origin, currentSubject) || (currentOrigin.isNotBlank() && isSubjectMatch(origin, currentOrigin))
-        }
-        val isUserChosen = userElectives.values.any { isSubjectMatch(it, resolvedSubject) }
+        })
+        val isUserChosen = userElectives.values.any { isSubjectMatch(it, resolvedSubject) } ||
+            (resolvedSubject == "なし" && userElectives[currentOrigin] == "なし")
         val isUnselectedElective = isElectiveSlot && !isUserChosen
 
         return createPeriodSchedule(
@@ -1260,7 +1349,7 @@ class CsvSyncManager(private val context: Context) {
         classGroup: ClassGroup
     ): String {
         val s = subjectName.trim()
-        if (s.isBlank()) return ""
+        if (s.isBlank() || s == "なし" || s == "授業なし" || s == "空き" || s == "-") return ""
 
         if (s.equals("\$hr", ignoreCase = true) || originName.trim().equals("\$hr", ignoreCase = true)) {
             val classNum = classGroup.id.replace("組", "").trim().ifBlank {
@@ -1491,7 +1580,8 @@ class CsvSyncManager(private val context: Context) {
     @androidx.annotation.VisibleForTesting
     fun setElectivesForTesting(list: List<ElectiveItemRow>) {
         this.electives = list
-        this.distinctElectiveOrigins = list.map { it.origin.trim() }.filter { it.isNotBlank() }.distinct()
+        val baseOrigins = list.map { it.origin.trim() }.filter { it.isNotBlank() }
+        this.distinctElectiveOrigins = (baseOrigins + SATURDAY_LECTURE_ORIGINS + "土曜講習").distinct()
     }
 
     @androidx.annotation.VisibleForTesting

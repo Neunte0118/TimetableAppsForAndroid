@@ -431,7 +431,7 @@ fun OnboardingElectivesDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "選択科目を選んでください。",
+                    "選択科目を選んでください。\n（受講しない土曜講習は「なし」を選択してください）",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 17.sp
@@ -1812,8 +1812,15 @@ fun ElectiveDropdownField(
     onOptionSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val sortedOptions = remember(options) {
-        options.sortedWith(Comparator { a, b -> compareDialogNaturalOrder(a, b) })
+    val sortedOptions = remember(origin, options) {
+        if (origin.startsWith("土曜講習") || origin.startsWith("土講")) {
+            val nonNone = options.filter { it != "なし" }
+            if (options.contains("なし")) nonNone + "なし" else nonNone
+        } else {
+            val nonNone = options.filter { it != "なし" }
+                .sortedWith(Comparator { a, b -> compareDialogNaturalOrder(a, b) })
+            if (options.contains("なし")) nonNone + "なし" else nonNone
+        }
     }
 
     Column(
@@ -1965,11 +1972,44 @@ fun ElectivesDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    "選択科目を選んでください。",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                val hasUnselected = remember(electiveOptions, userSelections) {
+                    electiveOptions.keys.any { origin ->
+                        val choice = userSelections[origin]?.trim() ?: ""
+                        choice.isBlank()
+                    }
+                }
+                if (hasUnselected) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                "未選択の項目があります。選択科目（受講しない土曜講習は「なし」）を選択してください。",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        "受講する科目を選択してください。（受講しない土曜講習は「なし」を選択）",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 if (electiveOptions.isEmpty()) {
                     Surface(

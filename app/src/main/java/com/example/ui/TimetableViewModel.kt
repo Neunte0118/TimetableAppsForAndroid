@@ -256,6 +256,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 if (!status.isSyncing) {
                     checkForAppUpdate()
+                    checkAndShowElectivesModalIfUnselected()
                 }
                 refreshSchedules()
             }
@@ -288,6 +289,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         checkForAppUpdate()
+        checkAndShowElectivesModalIfUnselected()
 
         refreshSchedules()
     }
@@ -652,6 +654,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
         refreshSchedules()
+        checkAndShowElectivesModalIfUnselected()
     }
 
     // 開発者メニュー
@@ -858,6 +861,33 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun closeClassDialog() {
         _uiState.update { it.copy(showClassDialog = false) }
+    }
+
+    fun hasUnselectedElectivesForClass(classId: String): Boolean {
+        val options = repository.csvSyncManager.getElectiveOptionsForClass(classId)
+        if (options.isEmpty()) return false
+        val userChoices = repository.getElectiveSelectionsForClass(classId)
+        return options.keys.any { origin ->
+            val choice = userChoices[origin]?.trim() ?: ""
+            choice.isBlank()
+        }
+    }
+
+    fun checkAndShowElectivesModalIfUnselected() {
+        if (!repository.hasCompletedInitialSetup()) return
+        val classId = _uiState.value.selectedClass.id
+        if (hasUnselectedElectivesForClass(classId)) {
+            val options = repository.csvSyncManager.getElectiveOptionsForClass(classId)
+            val userChoices = repository.getElectiveSelectionsForClass(classId)
+            _uiState.update {
+                it.copy(
+                    showElectivesDialog = true,
+                    showOtherMenuSheet = false,
+                    electiveOptionsForClass = options,
+                    userElectiveSelections = userChoices
+                )
+            }
+        }
     }
 
     fun openElectivesDialog() {
