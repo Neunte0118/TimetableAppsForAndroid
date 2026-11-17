@@ -849,6 +849,9 @@ class CsvSyncManager(private val context: Context) {
                 .filter { it.isNotBlank() }
                 .sortedWith(Comparator { a, b -> compareNaturalOrder(a, b) })
 
+            if (options.isNotEmpty()) {
+                resultMap[originKey] = options.toMutableList()
+            }
         }
 
         // 4. 土曜講習①〜④の欄を追加（それぞれ指定された選択肢 + 「なし」）
@@ -1172,7 +1175,6 @@ class CsvSyncManager(private val context: Context) {
         // 3.5 Check 土曜講習 (Saturday Lecture Schedule Changes)
         val isSaturday = (date.dayOfWeek == DayOfWeek.SATURDAY)
         if (isSaturday && period in 1..4) {
-            val satOrigin = "土曜講習${toCircledNumber(period)}"
             val hasSaturdayChange = specialRow != null ||
                 matchingTimetableChanges.isNotEmpty() ||
                 matchingCourseChange != null ||
@@ -1180,10 +1182,15 @@ class CsvSyncManager(private val context: Context) {
 
             val checkSubject = resolvedSubject.ifBlank { currentSubject }.trim()
             val checkOrigin = currentOrigin.trim()
+            val explicitSatOrigin = normalizeSaturdayLectureName(checkSubject).ifBlank {
+                normalizeSaturdayLectureName(checkOrigin)
+            }
+            val satOrigin = explicitSatOrigin.ifBlank { "土曜講習${toCircledNumber(period)}" }
 
-            val isSaturdayLectureSlot = isSaturdayLectureSubject(checkSubject, period) ||
-                isSaturdayLectureSubject(checkOrigin, period) ||
-                (hasSaturdayChange && (checkSubject.isBlank() || checkSubject == "土曜講習" || checkSubject == "土講"))
+            val isSaturdayLectureSlot = explicitSatOrigin.isNotBlank() ||
+                checkSubject.startsWith("土曜講習") || checkSubject.startsWith("土講") ||
+                checkOrigin.startsWith("土曜講習") || checkOrigin.startsWith("土講") ||
+                (hasSaturdayChange && (isSaturdayLectureSubject(checkSubject, period) || isSaturdayLectureSubject(checkOrigin, period) || checkSubject.isBlank()))
 
             if (isSaturdayLectureSlot) {
                 currentOrigin = satOrigin
@@ -1599,5 +1606,11 @@ class CsvSyncManager(private val context: Context) {
     @androidx.annotation.VisibleForTesting
     fun setSecondTermScheduleForTesting(list: List<BasicClassScheduleRow>) {
         this.secondTermClassSchedule = list
+    }
+
+    @androidx.annotation.VisibleForTesting
+    fun setTimetableChangesForTesting(list: List<TimetableChangeNotificationRow>) {
+        this.timetableChanges = list
+        this.timetableChangesByDate = list.groupBy { it.month to it.day }
     }
 }

@@ -148,6 +148,8 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     )
     val uiState: StateFlow<TimetableUiState> = _uiState.asStateFlow()
 
+    private val dismissedUnselectedClassesInSession = mutableSetOf<String>()
+
     init {
         // Collect repository states
         viewModelScope.launch {
@@ -189,6 +191,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
                 refreshSchedules()
+                checkAndShowElectivesModalIfUnselected(selectedClass.id)
             }
         }
 
@@ -654,7 +657,8 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
         refreshSchedules()
-        checkAndShowElectivesModalIfUnselected()
+        dismissedUnselectedClassesInSession.remove(classGroup.id)
+        checkAndShowElectivesModalIfUnselected(classGroup.id)
     }
 
     // 開発者メニュー
@@ -873,12 +877,12 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun checkAndShowElectivesModalIfUnselected() {
+    fun checkAndShowElectivesModalIfUnselected(targetClassId: String = _uiState.value.selectedClass.id) {
         if (!repository.hasCompletedInitialSetup()) return
-        val classId = _uiState.value.selectedClass.id
-        if (hasUnselectedElectivesForClass(classId)) {
-            val options = repository.csvSyncManager.getElectiveOptionsForClass(classId)
-            val userChoices = repository.getElectiveSelectionsForClass(classId)
+        if (dismissedUnselectedClassesInSession.contains(targetClassId)) return
+        if (hasUnselectedElectivesForClass(targetClassId)) {
+            val options = repository.csvSyncManager.getElectiveOptionsForClass(targetClassId)
+            val userChoices = repository.getElectiveSelectionsForClass(targetClassId)
             _uiState.update {
                 it.copy(
                     showElectivesDialog = true,
@@ -905,6 +909,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun closeElectivesDialog() {
+        dismissedUnselectedClassesInSession.add(_uiState.value.selectedClass.id)
         _uiState.update { it.copy(showElectivesDialog = false) }
     }
 
