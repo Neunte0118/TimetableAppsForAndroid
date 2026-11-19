@@ -41,6 +41,17 @@ data class EventRow(
     val event: String
 )
 
+// 4.5. 追加行事予定
+// dates, contents, light_color, dark_color
+data class AdditionalEventRow(
+    val dateStr: String,
+    val month: Int,
+    val day: Int,
+    val contents: String,
+    val lightColorHex: String = "",
+    val darkColorHex: String = ""
+)
+
 // 5. 祝日
 // dates, holidays
 data class HolidayRow(
@@ -236,6 +247,7 @@ data class CsvUrlsConfig(
     val electivesUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=1007938727&single=true&output=csv",
     val updatesUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=2022174384&single=true&output=csv",
     val eventsUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=1047451506&single=true&output=csv",
+    val additionalEventsUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR1dN6poNIpBsmis-JO2N2Hjiu96bkMuqs2fDtf1V3FH6iBs3BuQZVskaDq8n-xhoKEMdGYD-P5LscW/pub?gid=0&single=true&output=csv",
     val holidaysUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=652046519&single=true&output=csv",
     val timetableChangeSheetUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=963151426&single=true&output=csv",
     val courseChangeSheetUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=1632925210&single=true&output=csv",
@@ -245,7 +257,23 @@ data class CsvUrlsConfig(
     val secondTermClassUrl: String = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQSizltFHoOWYdi97m2q_x21-XHwaeeMTzbUk0jlWCZRAD-CmsGn9uKZQMe2rHbIxP7_pEekWK84yf9/pub?gid=763994660&single=true&output=csv",
     val reportUrl: String = "https://forms.gle/KiiEAds2vtjAmsZ97",
     val timetableChangeUrl: String = "https://docs.google.com/forms/d/e/1FAIpQLSfTOKMLJz896qfq7OKSv7TRwxxJxX4VIqXT4npLcGmqWNyBkg/viewform?usp=preview"
-)
+) {
+    companion object {
+        /**
+         * Google Sheets の /pubhtml URL を CSV 取得用の /pub?...&output=csv 形式へ正規化する
+         */
+        fun normalizeCsvUrl(url: String): String {
+            val trimmed = url.trim()
+            if (trimmed.isBlank()) return ""
+            if (!trimmed.contains("docs.google.com/spreadsheets/")) return trimmed
+            var normalized = trimmed.replace("/pubhtml", "/pub")
+            if (normalized.contains("/pub") && !normalized.contains("output=csv", ignoreCase = true)) {
+                normalized += if (normalized.contains("?")) "&output=csv" else "?output=csv"
+            }
+            return normalized
+        }
+    }
+}
 
 /**
  * CSV同期結果
@@ -260,6 +288,7 @@ data class CsvSyncStatus(
     val commonCount: Int = 0,
     val electiveCount: Int = 0,
     val eventCount: Int = 0,
+    val additionalEventCount: Int = 0,
     val holidayCount: Int = 0,
     val updateCount: Int = 0,
     val timetableChangeCount: Int = 0,

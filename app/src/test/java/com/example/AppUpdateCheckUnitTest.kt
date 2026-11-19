@@ -2,6 +2,9 @@ package com.example
 
 import com.example.data.csv.AppUpdateInfo
 import com.example.data.csv.CsvParser
+import com.example.ui.components.UpdateMarkdownBlock
+import com.example.ui.components.UpdateMarkdownParser
+import com.example.ui.components.UpdateMarkdownSpan
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -118,7 +121,6 @@ class AppUpdateCheckUnitTest {
     fun parseAppUpdateInfo_withBlankLink_generatesLatestUrlAutomatically() {
         val csv = """
             ver,info,link
-            1.4.0,・新機能の追加,
         """.trimIndent()
 
         val result = CsvParser.parseAppUpdateInfo(csv)
@@ -164,5 +166,85 @@ class AppUpdateCheckUnitTest {
             "https://github.com/Neunte0118/TimetableAppsForAndroid/releases/download/v1.5.0/timetable-app-v1.5.0.apk",
             AppUpdateInfo.buildDownloadUrl("Ver 1.5.0")
         )
+    }
+
+    @Test
+    fun parseUpdateHistory_preventsDateAndInfoColumnCollisionAndDeduplicates() {
+        val csv = """
+            ver,更新日,更新内容
+            1.4.10,2026/04/18,・不具合修正
+            v1.4.10,2026/04/18,・不具合修正
+        """.trimIndent()
+
+        val list = CsvParser.parseUpdateHistory(csv)
+        assertEquals(1, list.size)
+        assertEquals("1.4.10", list[0].version)
+        assertEquals("2026/04/18", list[0].dateStr)
+        assertEquals("・不具合修正", list[0].contents)
+    }
+
+    @Test
+    fun parseUpdateHistory_preservesMarkdownLinksAndCodeBlocks() {
+        val checksum = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        val csv = """
+            ver,info,link
+            1.4.10,"・更新詳細: [リリースノート](https://example.com/release)
+            https://example.com/bare-url-to-strip
+            ```sha256
+            $checksum
+            ```",https://example.com/app.apk
+        """.trimIndent()
+
+        val history = CsvParser.parseUpdateHistory(csv)
+        assertEquals(1, history.size)
+        val content = history[0].contents
+        assertTrue(content.contains("[リリースノート](https://example.com/release)"))
+        assertFalse(content.contains("bare-url-to-strip"))
+        assertTrue(content.contains("```sha256\n$checksum\n```"))
+
+        val appUpdate = CsvParser.parseAppUpdateInfo(csv)
+        assertNotNull(appUpdate)
+        assertTrue(appUpdate!!.info.contains("[リリースノート](https://example.com/release)"))
+        assertTrue(appUpdate.info.contains("```sha256\n$checksum\n```"))
+    }
+
+    @Test
+    fun updateMarkdownParser_parsesLinksAndCodeBlocks() {
+        val checksum = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        val input = """
+            ・詳細は[こちら](https://example.com/docs)をご確認ください
+            ```sha256
+            $checksum
+            ```
+        """.trimIndent()
+
+        val blocks = UpdateMarkdownParser.parseBlocks(input)
+        assertEquals(2, blocks.size)
+
+        val textBlock = blocks[0] as UpdateMarkdownBlock.TextBlock
+        assertEquals(
+            listOf(
+                UpdateMarkdownSpan.PlainText("・詳細は"),
+                UpdateMarkdownSpan.Link("こちら", "https://example.com/docs"),
+                UpdateMarkdownSpan.PlainText("をご確認ください")
+            ),
+            textBlock.spans
+        )
+
+        val codeBlock = blocks[1] as UpdateMarkdownBlock.CodeBlock
+        assertEquals("sha256", codeBlock.language)
+        assertEquals(checksum, codeBlock.code)
+    }
+
+    @Test
+    fun updateMarkdownParser_parsesSingleLineCodeBlockAndHashWithoutNewline() {
+        val hash = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+        val singleLineBlocks = UpdateMarkdownParser.parseBlocks("```$hash```")
+        assertEquals(1, singleLineBlocks.size)
+        assertEquals(hash, (singleLineBlocks[0] as UpdateMarkdownBlock.CodeBlock).code)
+
+        val multilineNoLangBlocks = UpdateMarkdownParser.parseBlocks("```\n$hash\n```")
+        assertEquals(1, multilineNoLangBlocks.size)
+        assertEquals(hash, (multilineNoLangBlocks[0] as UpdateMarkdownBlock.CodeBlock).code)
     }
 }

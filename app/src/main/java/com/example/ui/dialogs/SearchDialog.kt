@@ -25,6 +25,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.model.SearchResultItem
 import com.example.model.SearchResultType
+import com.example.model.parseHexColorOrNull
+import com.example.model.stripLinksToPlainText
+import com.example.ui.components.RichLinkText
+import androidx.compose.ui.graphics.luminance
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -181,11 +185,19 @@ private fun SearchResultCard(
     onClick: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
-    val (typeColor, typeIcon) = when (item.type) {
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val (baseTypeColor, typeIcon) = when (item.type) {
         SearchResultType.EVENT -> Pair(Color(0xFFE65100), Icons.Default.Event)
         SearchResultType.MEMO -> Pair(Color(0xFF00897B), Icons.Default.EditNote)
         SearchResultType.SUBJECT -> Pair(Color(0xFF3949AB), Icons.Default.School)
     }
+    val colorHex = if (isDark) {
+        item.darkColorHex.ifBlank { item.lightColorHex }
+    } else {
+        item.lightColorHex.ifBlank { item.darkColorHex }
+    }
+    val customAccent = parseHexColorOrNull(colorHex)
+    val typeColor = customAccent ?: baseTypeColor
 
     Card(
         modifier = Modifier
@@ -194,10 +206,11 @@ private fun SearchResultCard(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
-                    val textToCopy = if (item.snippet.isNotBlank() && item.snippet != item.title) {
-                        "${item.title} (${item.snippet})"
+                    val plainTitle = stripLinksToPlainText(item.title)
+                    val textToCopy = if (item.snippet.isNotBlank() && item.snippet != plainTitle) {
+                        "$plainTitle (${item.snippet})"
                     } else {
-                        item.title
+                        plainTitle
                     }
                     if (textToCopy.isNotBlank()) {
                         clipboardManager.setText(AnnotatedString(textToCopy))
@@ -206,7 +219,8 @@ private fun SearchResultCard(
             ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = customAccent?.copy(alpha = if (isDark) 0.22f else 0.14f)
+                ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -245,7 +259,7 @@ private fun SearchResultCard(
                         item.dayLabel,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.primary
+                        color = customAccent ?: MaterialTheme.colorScheme.primary
                     )
                     Text(
                         item.type.label,
@@ -255,13 +269,24 @@ private fun SearchResultCard(
                     )
                 }
 
-                Text(
-                    item.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
+                if (item.type == SearchResultType.EVENT) {
+                    RichLinkText(
+                        text = item.title,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        textColor = MaterialTheme.colorScheme.onSurface,
+                        linkColor = customAccent ?: MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        item.title,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
 
                 if (item.snippet.isNotBlank()) {
                     Text(

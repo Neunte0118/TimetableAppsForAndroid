@@ -51,6 +51,7 @@ class CsvSyncManager(private val context: Context) {
         const val KEY_TS_ELECTIVES = "sync_ts_electives"
         const val KEY_TS_UPDATES = "sync_ts_updates"
         const val KEY_TS_EVENTS = "sync_ts_events"
+        const val KEY_TS_ADDITIONAL_EVENTS = "sync_ts_additional_events"
         const val KEY_TS_TIMETABLE_CHANGES = "sync_ts_timetable_changes"
         const val KEY_TS_COURSE_CHANGES = "sync_ts_course_changes"
         const val KEY_TS_EXAM_SCHEDULE = "sync_ts_exam_schedule"
@@ -74,6 +75,8 @@ class CsvSyncManager(private val context: Context) {
     var electives: List<ElectiveItemRow> = emptyList()
         private set
     var events: List<EventRow> = emptyList()
+        private set
+    var additionalEvents: List<AdditionalEventRow> = emptyList()
         private set
     var holidays: List<HolidayRow> = emptyList()
         private set
@@ -103,6 +106,7 @@ class CsvSyncManager(private val context: Context) {
     private var timetableChangesByDate: Map<Pair<Int, Int>, List<TimetableChangeNotificationRow>> = emptyMap()
     private var courseChangesByDate: Map<Pair<Int, Int>, List<CourseChangeNotificationRow>> = emptyMap()
     private var eventsByDate: Map<Pair<Int, Int>, List<EventRow>> = emptyMap()
+    private var additionalEventsByDate: Map<Pair<Int, Int>, List<AdditionalEventRow>> = emptyMap()
     private var holidaysByDate: Map<Pair<Int, Int>, HolidayRow> = emptyMap()
     private var distinctElectiveOrigins: List<String> = emptyList()
 
@@ -115,6 +119,7 @@ class CsvSyncManager(private val context: Context) {
         timetableChangesByDate = timetableChanges.groupBy { it.month to it.day }
         courseChangesByDate = courseChanges.groupBy { it.month to it.day }
         eventsByDate = events.groupBy { it.month to it.day }
+        additionalEventsByDate = additionalEvents.groupBy { it.month to it.day }
         holidaysByDate = holidays.associateBy { it.month to it.day }
         val baseOrigins = electives.map { it.origin.trim() }.filter { it.isNotBlank() }
         distinctElectiveOrigins = (baseOrigins + SATURDAY_LECTURE_ORIGINS + "土曜講習").distinct()
@@ -190,6 +195,16 @@ class CsvSyncManager(private val context: Context) {
             savedSecondTerm
         }
 
+        val savedAdditionalEvents = prefs.getString("url_additional_events", null)
+        val effectiveAdditionalEvents = if (savedAdditionalEvents.isNullOrBlank()) {
+            prefs.edit()
+                .putString("url_additional_events", defaultConfig.additionalEventsUrl)
+                .apply()
+            defaultConfig.additionalEventsUrl
+        } else {
+            CsvUrlsConfig.normalizeCsvUrl(savedAdditionalEvents)
+        }
+
         val isLegacyTimetableChange = savedTimetableChangeSheet != null &&
             (savedTimetableChangeSheet.contains("2PACX-1vQiStJ") || savedTimetableChangeSheet.contains("gid=1149682638"))
         val effectiveTimetableChange = if (isLegacyTimetableChange || savedTimetableChangeSheet.isNullOrBlank()) {
@@ -220,6 +235,7 @@ class CsvSyncManager(private val context: Context) {
             electivesUrl = savedElectives ?: defaultConfig.electivesUrl,
             updatesUrl = effectiveUpdates,
             eventsUrl = savedEvents ?: defaultConfig.eventsUrl,
+            additionalEventsUrl = effectiveAdditionalEvents,
             holidaysUrl = savedHolidays ?: defaultConfig.holidaysUrl,
             timetableChangeSheetUrl = effectiveTimetableChange,
             courseChangeSheetUrl = effectiveCourseChange,
@@ -234,28 +250,31 @@ class CsvSyncManager(private val context: Context) {
 
     fun saveUrlsConfig(config: CsvUrlsConfig) {
         val oldUpdatesUrl = prefs.getString("url_updates", null)
+        val normalizedAdditionalEventsUrl = CsvUrlsConfig.normalizeCsvUrl(config.additionalEventsUrl)
+        val updatedConfig = config.copy(additionalEventsUrl = normalizedAdditionalEventsUrl)
         val edit = prefs.edit()
-            .putString("url_common_schedule", config.commonScheduleUrl.trim())
-            .putString("url_basic_class", config.basicClassUrl.trim())
-            .putString("url_electives", config.electivesUrl.trim())
-            .putString("url_updates", config.updatesUrl.trim())
-            .putString("url_events", config.eventsUrl.trim())
-            .putString("url_holidays", config.holidaysUrl.trim())
-            .putString("url_timetable_change_sheet", config.timetableChangeSheetUrl.trim())
-            .putString("url_course_change_sheet", config.courseChangeSheetUrl.trim())
-            .putString("url_exam_schedule", config.examScheduleUrl.trim())
-            .putString("url_subject_mapping", config.subjectMappingUrl.trim())
-            .putString("url_special_schedule", config.specialScheduleUrl.trim())
-            .putString("url_second_term_class", config.secondTermClassUrl.trim())
-            .putString("url_report", config.reportUrl.trim())
-            .putString("url_timetable_change", config.timetableChangeUrl.trim())
+            .putString("url_common_schedule", updatedConfig.commonScheduleUrl.trim())
+            .putString("url_basic_class", updatedConfig.basicClassUrl.trim())
+            .putString("url_electives", updatedConfig.electivesUrl.trim())
+            .putString("url_updates", updatedConfig.updatesUrl.trim())
+            .putString("url_events", updatedConfig.eventsUrl.trim())
+            .putString("url_additional_events", normalizedAdditionalEventsUrl)
+            .putString("url_holidays", updatedConfig.holidaysUrl.trim())
+            .putString("url_timetable_change_sheet", updatedConfig.timetableChangeSheetUrl.trim())
+            .putString("url_course_change_sheet", updatedConfig.courseChangeSheetUrl.trim())
+            .putString("url_exam_schedule", updatedConfig.examScheduleUrl.trim())
+            .putString("url_subject_mapping", updatedConfig.subjectMappingUrl.trim())
+            .putString("url_special_schedule", updatedConfig.specialScheduleUrl.trim())
+            .putString("url_second_term_class", updatedConfig.secondTermClassUrl.trim())
+            .putString("url_report", updatedConfig.reportUrl.trim())
+            .putString("url_timetable_change", updatedConfig.timetableChangeUrl.trim())
 
-        if (oldUpdatesUrl != null && oldUpdatesUrl != config.updatesUrl.trim()) {
+        if (oldUpdatesUrl != null && oldUpdatesUrl != updatedConfig.updatesUrl.trim()) {
             // URLが変更された場合は更新キャッシュを削除して古い情報が残らないようにする
             edit.remove("csv_cache_updates")
         }
         edit.apply()
-        _urlsConfig.value = config
+        _urlsConfig.value = updatedConfig
     }
 
     private fun loadSyncStatus(): CsvSyncStatus {
@@ -272,6 +291,7 @@ class CsvSyncManager(private val context: Context) {
         val commonCsv = prefs.getString("csv_cache_common_schedule", null) ?: DefaultCsvData.COMMON_SCHEDULE_CSV
         val electivesCsv = prefs.getString("csv_cache_electives", null) ?: DefaultCsvData.ELECTIVES_CSV
         val eventsCsv = prefs.getString("csv_cache_events", null) ?: DefaultCsvData.EVENTS_CSV
+        val additionalEventsCsv = prefs.getString("csv_cache_additional_events", null) ?: DefaultCsvData.ADDITIONAL_EVENTS_CSV
         val holidaysCsv = prefs.getString("csv_cache_holidays", null) ?: DefaultCsvData.HOLIDAYS_CSV
         val updatesCsv = prefs.getString("csv_cache_updates", null) ?: DefaultCsvData.UPDATE_HISTORY_CSV
         val timetableChangesCsv = prefs.getString("csv_cache_timetable_changes", null) ?: DefaultCsvData.TIMETABLE_CHANGE_CSV
@@ -286,6 +306,7 @@ class CsvSyncManager(private val context: Context) {
         commonSchedules = CsvParser.parseCommonSchedule(commonCsv)
         electives = CsvParser.parseElectives(electivesCsv)
         events = CsvParser.parseEvents(eventsCsv)
+        additionalEvents = if (additionalEventsCsv.isNotBlank()) CsvParser.parseAdditionalEvents(additionalEventsCsv) else emptyList()
         holidays = CsvParser.parseHolidays(holidaysCsv)
         updateHistories = CsvParser.parseUpdateHistory(updatesCsv)
         latestAppUpdateInfo = CsvParser.parseAppUpdateInfo(updatesCsv)
@@ -302,6 +323,7 @@ class CsvSyncManager(private val context: Context) {
             commonCount = commonSchedules.size,
             electiveCount = electives.size,
             eventCount = events.size,
+            additionalEventCount = additionalEvents.size,
             holidayCount = holidays.size,
             updateCount = updateHistories.size,
             timetableChangeCount = timetableChanges.size,
@@ -350,6 +372,7 @@ class CsvSyncManager(private val context: Context) {
             .remove("csv_cache_common_schedule")
             .remove("csv_cache_electives")
             .remove("csv_cache_events")
+            .remove("csv_cache_additional_events")
             .remove("csv_cache_holidays")
             .remove("csv_cache_updates")
             .remove("csv_cache_timetable_changes")
@@ -366,6 +389,7 @@ class CsvSyncManager(private val context: Context) {
             .remove(KEY_TS_ELECTIVES)
             .remove(KEY_TS_UPDATES)
             .remove(KEY_TS_EVENTS)
+            .remove(KEY_TS_ADDITIONAL_EVENTS)
             .remove(KEY_TS_TIMETABLE_CHANGES)
             .remove(KEY_TS_COURSE_CHANGES)
             .remove(KEY_TS_EXAM_SCHEDULE)
@@ -398,6 +422,7 @@ class CsvSyncManager(private val context: Context) {
         val fetchElectives = shouldFetchCsv("csv_cache_electives", KEY_TS_ELECTIVES, INTERVAL_DAY_MILLIS, force)
         val fetchUpdates = shouldFetchCsv("csv_cache_updates", KEY_TS_UPDATES, INTERVAL_DAY_MILLIS, force)
         val fetchEvents = shouldFetchCsv("csv_cache_events", KEY_TS_EVENTS, INTERVAL_DAY_MILLIS, force)
+        val fetchAdditionalEvents = shouldFetchCsv("csv_cache_additional_events", KEY_TS_ADDITIONAL_EVENTS, INTERVAL_DAY_MILLIS, force)
         val fetchTimetableChanges = shouldFetchCsv("csv_cache_timetable_changes", KEY_TS_TIMETABLE_CHANGES, INTERVAL_DAY_MILLIS, force)
         val fetchCourseChanges = shouldFetchCsv("csv_cache_course_changes", KEY_TS_COURSE_CHANGES, INTERVAL_DAY_MILLIS, force)
         val fetchExam = shouldFetchCsv("csv_cache_exam_schedule", KEY_TS_EXAM_SCHEDULE, INTERVAL_DAY_MILLIS, force)
@@ -422,6 +447,11 @@ class CsvSyncManager(private val context: Context) {
 
             val eventsDeferred = if (fetchEvents && config.eventsUrl.isNotBlank()) {
                 async { fetchUrlContent(config.eventsUrl) }
+            } else null
+
+            val additionalEventsUrlNormalized = CsvUrlsConfig.normalizeCsvUrl(config.additionalEventsUrl)
+            val additionalEventsDeferred = if (fetchAdditionalEvents && additionalEventsUrlNormalized.isNotBlank()) {
+                async { fetchUrlContent(additionalEventsUrlNormalized) }
             } else null
 
             val holidaysDeferred = if (fetchHolidays && config.holidaysUrl.isNotBlank()) {
@@ -497,6 +527,15 @@ class CsvSyncManager(private val context: Context) {
                 events = CsvParser.parseEvents(text)
                 updatedCount++
             }?.onFailure { errors.add("行事予定: " + it.localizedMessage) }
+
+            additionalEventsDeferred?.await()?.onSuccess { text ->
+                prefs.edit()
+                    .putString("csv_cache_additional_events", text)
+                    .putLong(KEY_TS_ADDITIONAL_EVENTS, now)
+                    .apply()
+                additionalEvents = CsvParser.parseAdditionalEvents(text)
+                updatedCount++
+            }?.onFailure { errors.add("追加行事予定: " + it.localizedMessage) }
 
             holidaysDeferred?.await()?.onSuccess { text ->
                 prefs.edit()
@@ -594,6 +633,7 @@ class CsvSyncManager(private val context: Context) {
             commonCount = commonSchedules.size,
             electiveCount = electives.size,
             eventCount = events.size,
+            additionalEventCount = additionalEvents.size,
             holidayCount = holidays.size,
             updateCount = updateHistories.size,
             timetableChangeCount = timetableChanges.size,
@@ -768,6 +808,41 @@ class CsvSyncManager(private val context: Context) {
         }
     }
 
+    private fun extractSaturdayLectureSubjects(text: String): Set<String> {
+        val norm = CsvNormalizer.normalizeSubject(text)
+        if (norm.isBlank()) return emptySet()
+        val found = linkedSetOf<String>()
+        if (norm.contains("数学D") || norm.contains("数D")) found.add("数学D")
+        if (norm.contains("数学F") || norm.contains("数F") ||
+            Regex("""(数学|数)D[/・,、\s]+F""").containsMatchIn(norm)) {
+            found.add("数学F")
+        }
+        if (norm.contains("倫理")) found.add("倫理")
+        if (norm.contains("数学E") || norm.contains("数E") ||
+            Regex("""倫理[/・,、\s]+E""").containsMatchIn(norm)) {
+            found.add("数学E")
+        }
+        if (norm.contains("国語A") || norm.contains("国A")) found.add("国語A")
+        if (norm.contains("国語B") || norm.contains("国B")) found.add("国語B")
+        return found
+    }
+
+    private fun satOriginForSubject(subject: String): String? = when (subject) {
+        "数学D", "数学F" -> "土曜講習①"
+        "倫理", "数学E" -> "土曜講習②"
+        "国語A" -> "土曜講習③"
+        "国語B" -> "土曜講習④"
+        else -> null
+    }
+
+    private fun allOptionsForSatOrigin(satOrigin: String): Set<String> = when (satOrigin) {
+        "土曜講習①" -> linkedSetOf("数学D", "数学F")
+        "土曜講習②" -> linkedSetOf("倫理", "数学E")
+        "土曜講習③" -> linkedSetOf("国語A")
+        "土曜講習④" -> linkedSetOf("国語B")
+        else -> emptySet()
+    }
+
     fun isSaturdayLectureSubject(subject: String, period: Int): Boolean {
         val s = subject.trim()
         if (s.isBlank()) return false
@@ -776,13 +851,7 @@ class CsvSyncManager(private val context: Context) {
             s == "土曜講習" || s == "土講" || s.startsWith("土曜講習") || s.startsWith("土講")) {
             return true
         }
-        return when (period) {
-            1 -> s == "数学D" || s == "数学F" || s.contains("数学D") || s.contains("数学F")
-            2 -> s == "倫理" || s == "数学E" || s.contains("倫理") || s.contains("数学E")
-            3 -> s == "国語A" || s.contains("国語A")
-            4 -> s == "国語B" || s.contains("国語B")
-            else -> false
-        }
+        return extractSaturdayLectureSubjects(s).isNotEmpty()
     }
 
     private fun compareNaturalOrder(a: String, b: String): Int {
@@ -1091,7 +1160,8 @@ class CsvSyncManager(private val context: Context) {
         }
 
         // 0.8 Check 特別時程時間割 (Special Schedule: date, period, subject, start_time, end_time)
-        val specialRow = specialSchedulesByDate[month to day]?.find { it.period == period }
+        val specialRows = specialSchedulesByDate[month to day]?.filter { it.period == period } ?: emptyList()
+        var specialRow = specialRows.firstOrNull()
         var specialStartTime = ""
         var specialEndTime = ""
 
@@ -1174,35 +1244,101 @@ class CsvSyncManager(private val context: Context) {
 
         // 3.5 Check 土曜講習 (Saturday Lecture Schedule Changes)
         val isSaturday = (date.dayOfWeek == DayOfWeek.SATURDAY)
-        if (isSaturday && period in 1..4) {
-            val hasSaturdayChange = specialRow != null ||
+        if (isSaturday) {
+            val hasSaturdayChange = specialRows.isNotEmpty() ||
                 matchingTimetableChanges.isNotEmpty() ||
                 matchingCourseChange != null ||
                 (commonSchedulesByDate[month to day]?.periodCodes?.getOrNull(period - 1)?.isNotBlank() == true)
 
-            val checkSubject = resolvedSubject.ifBlank { currentSubject }.trim()
-            val checkOrigin = currentOrigin.trim()
-            val explicitSatOrigin = normalizeSaturdayLectureName(checkSubject).ifBlank {
-                normalizeSaturdayLectureName(checkOrigin)
-            }
-            val satOrigin = explicitSatOrigin.ifBlank { "土曜講習${toCircledNumber(period)}" }
+            val candidateSubjects: List<String> = when {
+                matchingTimetableChanges.isNotEmpty() -> {
+                    val classSpecific = matchingTimetableChanges.filter { it.classId.trim() != "0" && it.classId.trim() != "全" }
+                    val targetChanges = if (classSpecific.isNotEmpty()) classSpecific else matchingTimetableChanges
+                    targetChanges.map { decodeSubjectCode(it.subject.trim(), classGroup.id, period, date).first }
+                }
+                matchingCourseChange != null -> listOf(resolvedSubject.ifBlank { currentSubject }.trim())
+                specialRows.isNotEmpty() -> specialRows.map { decodeSubjectCode(it.subject, classGroup.id, period, date).first }
+                else -> listOf(resolvedSubject.ifBlank { currentSubject }.trim())
+            }.filter { it.isNotBlank() }
 
-            val isSaturdayLectureSlot = explicitSatOrigin.isNotBlank() ||
-                checkSubject.startsWith("土曜講習") || checkSubject.startsWith("土講") ||
-                checkOrigin.startsWith("土曜講習") || checkOrigin.startsWith("土講") ||
-                (hasSaturdayChange && (isSaturdayLectureSubject(checkSubject, period) || isSaturdayLectureSubject(checkOrigin, period) || checkSubject.isBlank()))
+            val explicitOrigins = (candidateSubjects + listOfNotNull(
+                if (matchingTimetableChanges.isEmpty() && matchingCourseChange == null) currentOrigin else null
+            )).map { normalizeSaturdayLectureName(it) }.filter { it.isNotBlank() }
+
+            val hasGenericSatPrefix = candidateSubjects.any { c ->
+                val t = c.trim()
+                t.startsWith("土曜講習") || t.startsWith("土講")
+            } || (matchingTimetableChanges.isEmpty() && matchingCourseChange == null &&
+                (currentOrigin.trim().startsWith("土曜講習") || currentOrigin.trim().startsWith("土講")))
+
+            val detectedSpecificSubjects = linkedSetOf<String>()
+            candidateSubjects.forEach { c ->
+                detectedSpecificSubjects.addAll(extractSaturdayLectureSubjects(c))
+            }
+
+            val isBlankWithSatChange = hasSaturdayChange && period in 1..4 && candidateSubjects.isEmpty()
+
+            val isSaturdayLectureSlot = explicitOrigins.isNotEmpty() ||
+                hasGenericSatPrefix ||
+                (hasSaturdayChange && detectedSpecificSubjects.isNotEmpty()) ||
+                isBlankWithSatChange
 
             if (isSaturdayLectureSlot) {
-                currentOrigin = satOrigin
-                val userChoice = userElectives[satOrigin]?.trim() ?: ""
-                if (userChoice.isNotBlank()) {
-                    resolvedSubject = userChoice
+                val satOrigin = explicitOrigins.firstOrNull()
+                    ?: detectedSpecificSubjects.firstNotNullOfOrNull { satOriginForSubject(it) }
+                    ?: if (period in 1..4) "土曜講習${toCircledNumber(period)}" else ""
+
+                if (satOrigin.isNotBlank()) {
+                    currentOrigin = satOrigin
+                    val offeredOptions: Set<String> = if (detectedSpecificSubjects.isNotEmpty()) {
+                        detectedSpecificSubjects
+                    } else {
+                        allOptionsForSatOrigin(satOrigin)
+                    }
+
+                    val userChoice = userElectives[satOrigin]?.trim() ?: ""
+                    when {
+                        userChoice == "なし" -> {
+                            resolvedSubject = ""
+                            specialStartTime = ""
+                            specialEndTime = ""
+                        }
+                        userChoice.isNotBlank() -> {
+                            val isOffered = offeredOptions.any { isSubjectMatch(it, userChoice) }
+                            if (isOffered) {
+                                resolvedSubject = userChoice
+                                // 複数の特別時程行がある場合、一致する行の開始・終了時刻を優先
+                                val matchedSpecialRow = specialRows.find { row ->
+                                    val decoded = decodeSubjectCode(row.subject, classGroup.id, period, date).first
+                                    extractSaturdayLectureSubjects(decoded).any { isSubjectMatch(it, userChoice) } ||
+                                        isSubjectMatch(decoded, userChoice)
+                                }
+                                if (matchedSpecialRow != null) {
+                                    specialRow = matchedSpecialRow
+                                    specialStartTime = matchedSpecialRow.startTime
+                                    specialEndTime = matchedSpecialRow.endTime
+                                }
+                            } else {
+                                // 当日開講されていない選択肢を選んでいる場合は何も表示しない
+                                resolvedSubject = ""
+                                specialStartTime = ""
+                                specialEndTime = ""
+                            }
+                        }
+                        else -> {
+                            // 未選択の場合も何も表示しない
+                            resolvedSubject = ""
+                            specialStartTime = ""
+                            specialEndTime = ""
+                        }
+                    }
                 }
             }
         }
 
         // 4. Resolve classroom from CSV (選択科目 name column)
-        val classroom = if (resolvedSubject == "なし") "" else resolveClassroom(resolvedSubject, currentOrigin, classGroup)
+        val isEmptyOrNone = resolvedSubject.isBlank() || resolvedSubject == "なし" || resolvedSubject == "授業なし" || resolvedSubject == "空き"
+        val classroom = if (isEmptyOrNone) "" else resolveClassroom(resolvedSubject, currentOrigin, classGroup)
 
         // 共通科目またはHR教室の授業（自教室）は選択コマではなく共通必修のため未選択扱いしない
         val isCommon = isCommonSubject(resolvedSubject, currentOrigin) ||
@@ -1214,7 +1350,7 @@ class CsvSyncManager(private val context: Context) {
             isSubjectMatch(origin, currentSubject) || (currentOrigin.isNotBlank() && isSubjectMatch(origin, currentOrigin))
         })
         val isUserChosen = userElectives.values.any { isSubjectMatch(it, resolvedSubject) } ||
-            (resolvedSubject == "なし" && userElectives[currentOrigin] == "なし")
+            (isEmptyOrNone && !userElectives[currentOrigin].isNullOrBlank())
         val isUnselectedElective = isElectiveSlot && !isUserChosen
 
         return createPeriodSchedule(
@@ -1510,6 +1646,10 @@ class CsvSyncManager(private val context: Context) {
         return formatEventText(combined)
     }
 
+    fun getAdditionalEventsForDate(date: LocalDate): List<AdditionalEventRow> {
+        return additionalEventsByDate[date.monthValue to date.dayOfMonth].orEmpty()
+    }
+
     /**
      * Creates PeriodSchedule with clean theme colors and actual CSV classroom (no mock data).
      */
@@ -1530,14 +1670,13 @@ class CsvSyncManager(private val context: Context) {
         endTime: String = "",
         isUnselectedElective: Boolean = false
     ): PeriodSchedule {
-        val sub = subject.trim()
+        val rawSub = subject.trim()
+        val sub = if (rawSub == "なし" || rawSub == "授業なし" || rawSub == "空き") "" else rawSub
 
         val (finalStartTime, finalEndTime) = when {
+            sub.isBlank() || sub == "-" -> "" to ""
             startTime.isNotBlank() || endTime.isNotBlank() -> startTime to endTime
-            sub.isNotBlank() && sub != "-" && sub != "なし" && sub != "授業なし" && sub != "空き" -> {
-                com.example.model.StandardPeriodTimes.getTimes(period) ?: ("" to "")
-            }
-            else -> "" to ""
+            else -> com.example.model.StandardPeriodTimes.getTimes(period) ?: ("" to "")
         }
 
         if (sub.isBlank()) {
@@ -1551,8 +1690,8 @@ class CsvSyncManager(private val context: Context) {
                 isChanged = isChanged,
                 isExam = isExam,
                 isSpecialSchedule = isSpecialSchedule,
-                startTime = finalStartTime,
-                endTime = finalEndTime,
+                startTime = "",
+                endTime = "",
                 isUnselectedElective = isUnselectedElective
             )
         }
@@ -1612,5 +1751,11 @@ class CsvSyncManager(private val context: Context) {
     fun setTimetableChangesForTesting(list: List<TimetableChangeNotificationRow>) {
         this.timetableChanges = list
         this.timetableChangesByDate = list.groupBy { it.month to it.day }
+    }
+
+    @androidx.annotation.VisibleForTesting
+    fun setAdditionalEventsForTesting(list: List<AdditionalEventRow>) {
+        this.additionalEvents = list
+        this.additionalEventsByDate = list.groupBy { it.month to it.day }
     }
 }

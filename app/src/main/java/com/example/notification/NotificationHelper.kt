@@ -194,7 +194,8 @@ object NotificationHelper {
             }
         }
 
-        val eventText = if (schedule.event.isNotBlank()) schedule.event.trim() else "なし"
+        val combinedEvent = schedule.combinedPlainEventText()
+        val eventText = if (combinedEvent.isNotBlank()) combinedEvent else "なし"
         val memoText = if (schedule.memo.isNotBlank()) schedule.memo.trim() else "なし"
 
         // 行事の上に改行
@@ -222,8 +223,8 @@ object NotificationHelper {
 
         val summaryText = if (activePeriods.isNotEmpty()) {
             activePeriods.joinToString(", ") { it.subject }
-        } else if (schedule.event.isNotBlank()) {
-            "行事: ${schedule.event}"
+        } else if (combinedEvent.isNotBlank()) {
+            "行事: $combinedEvent"
         } else {
             "予定はありません"
         }

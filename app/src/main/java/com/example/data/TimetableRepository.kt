@@ -529,6 +529,13 @@ class TimetableRepository(private val context: Context) {
 
         // Event from CSV (Read only)
         val event = csvSyncManager.getEventForDate(date)
+        val additionalEvents = csvSyncManager.getAdditionalEventsForDate(date).map { row ->
+            AdditionalEventDisplayItem(
+                contents = row.contents,
+                lightColorHex = row.lightColorHex,
+                darkColorHex = row.darkColorHex
+            )
+        }
 
         // Memo (User notes)
         val savedMemo = prefs.getString(getMemoKey(classGroup.id, date), null)
@@ -545,6 +552,7 @@ class TimetableRepository(private val context: Context) {
             dayLabel = relativeLabel,
             periods = periods,
             event = event,
+            additionalEvents = additionalEvents,
             memo = memo
         )
         dayScheduleCache[cacheKey] = daySchedule
@@ -563,7 +571,7 @@ class TimetableRepository(private val context: Context) {
         val today = LocalDate.now()
         val formatter = DateTimeFormatter.ofPattern("M月d日 (E)", Locale.JAPANESE)
 
-        // 過去30日から未来180日の行事・祝日
+        // 過去30日から未来180日の行事・追加行事・祝日
         for (i in -30..180) {
             val date = today.plusDays(i.toLong())
             val eventText = csvSyncManager.getEventForDate(date)
@@ -579,8 +587,25 @@ class TimetableRepository(private val context: Context) {
                     )
                 )
             }
+            val addEvents = csvSyncManager.getAdditionalEventsForDate(date)
+            for (addRow in addEvents) {
+                val formattedAdd = formatEventText(addRow.contents)
+                if (formattedAdd.isNotBlank()) {
+                    results.add(
+                        SearchResultItem(
+                            date = date,
+                            dayLabel = date.format(formatter),
+                            type = SearchResultType.EVENT,
+                            title = formattedAdd,
+                            snippet = "日付: ${date.monthValue}月${date.dayOfMonth}日 (追加行事予定)",
+                            lightColorHex = addRow.lightColorHex,
+                            darkColorHex = addRow.darkColorHex
+                        )
+                    )
+                }
+            }
         }
-        return results.distinctBy { Pair(it.date, it.title) }.sortedBy { it.date }
+        return results.distinctBy { Triple(it.date, it.title, it.snippet) }.sortedBy { it.date }
     }
 
     fun getAllMemos(classId: String): List<SearchResultItem> {
@@ -648,6 +673,29 @@ class TimetableRepository(private val context: Context) {
                             type = SearchResultType.EVENT,
                             title = formatEventText(eventRow.event).replace("\n", " / "),
                             snippet = "日付: ${eventRow.month}月${eventRow.day}日 (行事予定)"
+                        )
+                    )
+                } catch (_: Exception) {}
+            }
+        }
+
+        for (addRow in csvSyncManager.additionalEvents) {
+            val plain = stripLinksToPlainText(addRow.contents)
+            val addNormalized = normalizeQuery(plain)
+            val isDateHit = searchMonth != null && searchDay != null && addRow.month == searchMonth && addRow.day == searchDay
+            if (isDateHit || addNormalized.contains(normalized)) {
+                val year = if (addRow.month < 4) currentSchoolYear + 1 else currentSchoolYear
+                try {
+                    val date = LocalDate.of(year, addRow.month, addRow.day)
+                    results.add(
+                        SearchResultItem(
+                            date = date,
+                            dayLabel = date.format(formatter),
+                            type = SearchResultType.EVENT,
+                            title = addRow.contents,
+                            snippet = "日付: ${addRow.month}月${addRow.day}日 (追加行事予定)",
+                            lightColorHex = addRow.lightColorHex,
+                            darkColorHex = addRow.darkColorHex
                         )
                     )
                 } catch (_: Exception) {}
@@ -729,14 +777,14 @@ class TimetableRepository(private val context: Context) {
                             dayLabel = date.format(formatter),
                             type = SearchResultType.SUBJECT,
                             title = "時間割: $periodText",
-                            snippet = schedule.event.ifBlank { "通常授業" }.replace("\n", " / ")
+                            snippet = schedule.combinedPlainEventText().ifBlank { "通常授業" }.replace("\n", " / ")
                         )
                     )
                 }
             }
         }
 
-        return results.distinctBy { Pair(it.date, it.title) }.sortedBy { it.date }
+        return results.distinctBy { Triple(it.date, it.title, it.snippet) }.sortedBy { it.date }
     }
 
     private fun normalizeQuery(input: String): String {

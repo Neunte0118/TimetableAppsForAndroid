@@ -370,7 +370,8 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                 }
 
                 // 2. Set Event & Memo content
-                val eventText = if (schedule.event.isNotBlank()) schedule.event.trim() else "なし"
+                val combinedEvent = schedule.combinedPlainEventText()
+                val eventText = if (combinedEvent.isNotBlank()) combinedEvent else "なし"
                 val memoText = if (schedule.memo.isNotBlank()) schedule.memo.trim() else "なし"
 
                 // キャッシュが空の場合、バックグラウンドで最新CSVを取得して自動反映

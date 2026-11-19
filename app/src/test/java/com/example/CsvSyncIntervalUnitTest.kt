@@ -126,6 +126,7 @@ class CsvSyncIntervalUnitTest {
             "csv_cache_electives" to (CsvSyncManager.KEY_TS_ELECTIVES to CsvSyncManager.INTERVAL_DAY_MILLIS),
             "csv_cache_updates" to (CsvSyncManager.KEY_TS_UPDATES to CsvSyncManager.INTERVAL_DAY_MILLIS),
             "csv_cache_events" to (CsvSyncManager.KEY_TS_EVENTS to CsvSyncManager.INTERVAL_DAY_MILLIS),
+            "csv_cache_additional_events" to (CsvSyncManager.KEY_TS_ADDITIONAL_EVENTS to CsvSyncManager.INTERVAL_DAY_MILLIS),
             "csv_cache_timetable_changes" to (CsvSyncManager.KEY_TS_TIMETABLE_CHANGES to CsvSyncManager.INTERVAL_DAY_MILLIS),
             "csv_cache_course_changes" to (CsvSyncManager.KEY_TS_COURSE_CHANGES to CsvSyncManager.INTERVAL_DAY_MILLIS),
             "csv_cache_exam_schedule" to (CsvSyncManager.KEY_TS_EXAM_SCHEDULE to CsvSyncManager.INTERVAL_DAY_MILLIS),

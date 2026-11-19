@@ -25,6 +25,11 @@ origin,electives,name
 dates,events
 """.trimIndent()
 
+    // 4.5. 追加行事予定
+    val ADDITIONAL_EVENTS_CSV = """
+dates,contents,light_color,dark_color
+""".trimIndent()
+
     // 5. 祝日
     val HOLIDAYS_CSV = """
 dates,holidays

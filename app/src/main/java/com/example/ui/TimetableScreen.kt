@@ -23,12 +23,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.AdditionalEventDisplayItem
 import com.example.model.TimetableViewMode
+import com.example.model.parseHexColorOrNull
+import com.example.model.stripLinksToPlainText
+import com.example.ui.components.RichLinkText
 import com.example.ui.components.TimetableTable
 import com.example.ui.dialogs.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -289,6 +294,7 @@ fun TimetableScreen(
                             selectedDate = uiState.selectedDate,
                             isToday = uiState.selectedDate == uiState.currentDate,
                             eventText = uiState.selectedDateEvent,
+                            additionalEvents = uiState.selectedDateAdditionalEvents,
                             memoText = uiState.selectedDateMemo,
                             minMemoLines = memoMinLines,
                             onSaveMemo = { newMemo -> viewModel.saveSelectedDateMemo(newMemo) }
@@ -683,11 +689,13 @@ fun SelectedDayEventMemoSection(
     selectedDate: LocalDate,
     isToday: Boolean,
     eventText: String,
+    additionalEvents: List<AdditionalEventDisplayItem> = emptyList(),
     memoText: String,
     minMemoLines: Int = 2,
     onSaveMemo: (String) -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val dateFormatted = remember(selectedDate) {
         selectedDate.format(DateTimeFormatter.ofPattern("M月d日 (E)", Locale.JAPANESE))
     }
@@ -753,7 +761,7 @@ fun SelectedDayEventMemoSection(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             // 1. 行事 (Event) Display Field - Non-editable (Read-only)
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -772,30 +780,116 @@ fun SelectedDayEventMemoSection(
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .combinedClickable(
-                            onClick = { /* no-op */ },
-                            onLongClick = {
-                                val text = eventText.trim()
-                                if (text.isNotBlank() && text != "行事はありません" && text != "なし") {
-                                    clipboardManager.setText(AnnotatedString(text))
+                val hasMainEvent = eventText.isNotBlank()
+                val hasAnyEvent = hasMainEvent || additionalEvents.isNotEmpty()
+                val copyPayload = remember(eventText, additionalEvents) {
+                    buildList {
+                        val cleanedMain = stripLinksToPlainText(eventText)
+                        if (cleanedMain.isNotBlank()) add(cleanedMain)
+                        additionalEvents.forEach { item ->
+                            val cleanedAdd = stripLinksToPlainText(item.contents)
+                            if (cleanedAdd.isNotBlank()) add(cleanedAdd)
+                        }
+                    }.joinToString("\n")
+                }
+
+                if (!hasAnyEvent) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "行事はありません",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                        )
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { /* no-op */ },
+                                onLongClick = {
+                                    if (copyPayload.isNotBlank() && copyPayload != "行事はありません" && copyPayload != "なし") {
+                                        clipboardManager.setText(AnnotatedString(copyPayload))
+                                    }
+                                }
+                            )
+                    ) {
+                        if (hasMainEvent) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                RichLinkText(
+                                    text = eventText,
+                                    fontSize = 13.sp,
+                                    lineHeight = 19.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textColor = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                )
+                            }
+                        }
+
+                        additionalEvents.forEachIndexed { idx, addItem ->
+                            val colorHex = if (isDark) {
+                                addItem.darkColorHex.ifBlank { addItem.lightColorHex }
+                            } else {
+                                addItem.lightColorHex.ifBlank { addItem.darkColorHex }
+                            }
+                            val accentColor = parseHexColorOrNull(colorHex)
+                            val containerColor = accentColor?.copy(alpha = if (isDark) 0.22f else 0.16f)
+                                ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            val borderColor = accentColor?.copy(alpha = 0.55f)
+                                ?: MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = containerColor,
+                                border = BorderStroke(1.dp, borderColor),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("additional_event_item_$idx")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min)
+                                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (accentColor != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(4.dp)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(accentColor)
+                                        )
+                                    }
+                                    RichLinkText(
+                                        text = addItem.contents,
+                                        fontSize = 13.sp,
+                                        lineHeight = 19.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        textColor = MaterialTheme.colorScheme.onSurface,
+                                        linkColor = accentColor ?: MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
                             }
-                        )
-                ) {
-                    Text(
-                        text = if (eventText.isNotBlank()) eventText else "行事はありません",
-                        fontSize = 13.sp,
-                        fontWeight = if (eventText.isNotBlank()) FontWeight.Medium else FontWeight.Normal,
-                        color = if (eventText.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                    )
+                        }
+                    }
                 }
             }
 

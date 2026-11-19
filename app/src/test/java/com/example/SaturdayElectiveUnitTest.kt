@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.data.csv.BasicClassScheduleRow
 import com.example.data.csv.CsvSyncManager
 import com.example.data.csv.ElectiveItemRow
+import com.example.data.csv.SpecialScheduleRow
 import com.example.data.csv.TimetableChangeNotificationRow
 import com.example.model.ClassGroup
 import org.junit.Assert.assertEquals
@@ -107,24 +108,134 @@ class SaturdayElectiveUnitTest {
         assertEquals("数学F", periodMathF.subject)
         assertFalse(periodMathF.isUnselectedElective)
 
-        // 2. 「なし」を選択した場合
+        // 2. 「なし」を選択した場合 → 何も表示しない
         val periodNone = syncManager.resolvePeriodSchedule(
             classGroup = class3,
             date = saturday,
             period = 1,
             userElectives = mapOf("土曜講習①" to "なし")
         )
-        assertEquals("なし", periodNone.subject)
+        assertEquals("", periodNone.subject)
         assertEquals("", periodNone.classroom)
+        assertEquals("", periodNone.startTime)
+        assertEquals("", periodNone.endTime)
         assertFalse(periodNone.isUnselectedElective)
 
-        // 3. 未選択の場合
+        // 3. 未選択の場合 → 何も表示しない
         val periodUnselected = syncManager.resolvePeriodSchedule(
             classGroup = class3,
             date = saturday,
             period = 1,
             userElectives = emptyMap()
         )
+        assertEquals("", periodUnselected.subject)
+        assertEquals("", periodUnselected.classroom)
+        assertEquals("", periodUnselected.startTime)
+        assertEquals("", periodUnselected.endTime)
         assertTrue(periodUnselected.isUnselectedElective)
+    }
+
+    @Test
+    fun testSaturdaySingleSubjectOnlyDayDoesNotShowUnheldAlternative() {
+        // 2026/11/21 は土曜日: この日は1限が「数学D」のみで、数学Fは開講されない日
+        val saturdayDOnly = LocalDate.of(2026, 11, 21)
+        val class3 = ClassGroup(id = "3", name = "3組", grade = 3, section = "3")
+
+        syncManager.setSpecialScheduleForTesting(
+            listOf(
+                SpecialScheduleRow(
+                    dateStr = "11/21",
+                    month = 11,
+                    day = 21,
+                    period = 1,
+                    subject = "数学D",
+                    startTime = "8:50",
+                    endTime = "9:40"
+                ),
+                SpecialScheduleRow(
+                    dateStr = "11/21",
+                    month = 11,
+                    day = 21,
+                    period = 2,
+                    subject = "倫理",
+                    startTime = "9:50",
+                    endTime = "10:40"
+                )
+            )
+        )
+
+        // 数学Dを選択しているユーザー → 「数学D」が表示される
+        val p1MathDUser = syncManager.resolvePeriodSchedule(
+            classGroup = class3,
+            date = saturdayDOnly,
+            period = 1,
+            userElectives = mapOf("土曜講習①" to "数学D")
+        )
+        assertEquals("数学D", p1MathDUser.subject)
+        assertEquals("8:50", p1MathDUser.startTime)
+        assertEquals("9:40", p1MathDUser.endTime)
+        assertFalse(p1MathDUser.isUnselectedElective)
+
+        // 数学Fを選択しているユーザー → Dだけの日なのでFは表示されず何も表示しない
+        val p1MathFUser = syncManager.resolvePeriodSchedule(
+            classGroup = class3,
+            date = saturdayDOnly,
+            period = 1,
+            userElectives = mapOf("土曜講習①" to "数学F")
+        )
+        assertEquals("", p1MathFUser.subject)
+        assertEquals("", p1MathFUser.classroom)
+        assertEquals("", p1MathFUser.startTime)
+        assertEquals("", p1MathFUser.endTime)
+        assertFalse(p1MathFUser.isUnselectedElective)
+
+        // 数学Eを選択しているユーザー → 倫理だけの日なので数学Eは表示されず何も表示しない
+        val p2MathEUser = syncManager.resolvePeriodSchedule(
+            classGroup = class3,
+            date = saturdayDOnly,
+            period = 2,
+            userElectives = mapOf("土曜講習②" to "数学E")
+        )
+        assertEquals("", p2MathEUser.subject)
+        assertEquals("", p2MathEUser.startTime)
+        assertEquals("", p2MathEUser.endTime)
+        assertFalse(p2MathEUser.isUnselectedElective)
+
+        // 未選択のユーザー → 何も表示しない
+        val p1UnselectedUser = syncManager.resolvePeriodSchedule(
+            classGroup = class3,
+            date = saturdayDOnly,
+            period = 1,
+            userElectives = emptyMap()
+        )
+        assertEquals("", p1UnselectedUser.subject)
+        assertEquals("", p1UnselectedUser.startTime)
+        assertEquals("", p1UnselectedUser.endTime)
+
+        // 複数行または「数学D/数学F」表記の日は、選択している数学Fが表示される
+        val saturdayBoth = LocalDate.of(2026, 11, 28)
+        syncManager.setSpecialScheduleForTesting(
+            listOf(
+                SpecialScheduleRow(
+                    dateStr = "11/28",
+                    month = 11,
+                    day = 28,
+                    period = 1,
+                    subject = "数学D/数学F",
+                    startTime = "8:50",
+                    endTime = "9:40"
+                )
+            )
+        )
+        val p1BothMathF = syncManager.resolvePeriodSchedule(
+            classGroup = class3,
+            date = saturdayBoth,
+            period = 1,
+            userElectives = mapOf("土曜講習①" to "数学F")
+        )
+        assertEquals("数学F", p1BothMathF.subject)
+        assertEquals("8:50", p1BothMathF.startTime)
+        assertEquals("9:40", p1BothMathF.endTime)
+        assertFalse(p1BothMathF.isUnselectedElective)
     }
 }

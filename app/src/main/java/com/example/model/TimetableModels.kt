@@ -78,13 +78,36 @@ object StandardPeriodTimes {
     }
 }
 
+data class AdditionalEventDisplayItem(
+    val contents: String,
+    val lightColorHex: String = "",
+    val darkColorHex: String = ""
+)
+
 data class DaySchedule(
     val date: LocalDate,
     val dayLabel: String,      // "今日", "翌日", "2日後", "3日後", etc.
     val periods: List<PeriodSchedule>,
     val event: String = "",    // 行事 (避難訓練, テスト期間, etc.)
+    val additionalEvents: List<AdditionalEventDisplayItem> = emptyList(),
     val memo: String = ""      // メモ (宿題, 提出物, etc.)
-)
+) {
+    /**
+     * 通知・ウィジェット・クリップボードコピー用のプレーンテキスト（通常行事＋追加行事を改行区切りで結合、リンク記法は表示タイトルのみ抽出）
+     */
+    fun combinedPlainEventText(): String {
+        val parts = mutableListOf<String>()
+        if (event.isNotBlank()) {
+            val cleaned = stripLinksToPlainText(event)
+            if (cleaned.isNotBlank()) parts.add(cleaned)
+        }
+        additionalEvents.forEach { item ->
+            val cleaned = stripLinksToPlainText(item.contents)
+            if (cleaned.isNotBlank()) parts.add(cleaned)
+        }
+        return parts.joinToString("\n")
+    }
+}
 
 data class ElectiveChoice(
     val id: String,
@@ -104,7 +127,9 @@ data class SearchResultItem(
     val dayLabel: String,
     val type: SearchResultType,
     val title: String,
-    val snippet: String
+    val snippet: String,
+    val lightColorHex: String = "",
+    val darkColorHex: String = ""
 )
 
 /**
@@ -139,6 +164,47 @@ data class SubjectColorGroup(
 fun formatEventText(text: String): String {
     if (text.isBlank()) return ""
     return text.replace(Regex("(?i)<br\\s*/?>"), "\n").trim()
+}
+
+/**
+ * HTMLアンカー (<a href="...">title</a>) および Markdownリンク ([title](url)) から
+ * 表示タイトルのみを残したプレーンテキストに変換する
+ */
+fun stripLinksToPlainText(text: String): String {
+    if (text.isBlank()) return ""
+    var result = formatEventText(text)
+    result = result.replace(
+        Regex("""<a\s+[^>]*href\s*=\s*["'][^"']+["'][^>]*>([\s\S]*?)</a>""", RegexOption.IGNORE_CASE)
+    ) { match ->
+        match.groupValues[1].trim()
+    }
+    result = result.replace(
+        Regex("""\[([^\]]+)\]\(https?://[^\s)]+\)""")
+    ) { match ->
+        match.groupValues[1].trim()
+    }
+    return result
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+        .trim()
+}
+
+/**
+ * "#RRGGBB" または "#AARRGGBB" を Compose Color に安全にパースする
+ */
+fun parseHexColorOrNull(hex: String): Color? {
+    val trimmed = hex.trim()
+    if (trimmed.isBlank()) return null
+    val normalized = if (trimmed.startsWith("#")) trimmed else "#$trimmed"
+    return try {
+        Color(android.graphics.Color.parseColor(normalized))
+    } catch (_: Exception) {
+        null
+    }
 }
 
 /**

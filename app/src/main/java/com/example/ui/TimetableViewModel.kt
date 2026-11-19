@@ -61,6 +61,7 @@ data class TimetableUiState(
     val displayBlockSchedulesList: List<List<DaySchedule>> = emptyList(),
     // 選択された日付の行事(読み取り専用)とメモ
     val selectedDateEvent: String = "",
+    val selectedDateAdditionalEvents: List<AdditionalEventDisplayItem> = emptyList(),
     val selectedDateMemo: String = "",
     val isDarkTheme: Boolean = false,
     // 毎日の時間割通知
@@ -149,6 +150,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<TimetableUiState> = _uiState.asStateFlow()
 
     private val dismissedUnselectedClassesInSession = mutableSetOf<String>()
+    private var shownAutoUpdateVersionInSession: String? = null
 
     init {
         // Collect repository states
@@ -291,7 +293,6 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             repository.syncCsvData(force = false)
         }
 
-        checkForAppUpdate()
         checkAndShowElectivesModalIfUnselected()
 
         refreshSchedules()
@@ -527,6 +528,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 currentBlockSchedules = bundle.currentBlock,
                 displayBlockSchedulesList = bundle.displayBlocks,
                 selectedDateEvent = bundle.selectedEvent,
+                selectedDateAdditionalEvents = bundle.selectedAdditionalEvents,
                 selectedDateMemo = bundle.selectedMemo
             )
         }
@@ -554,6 +556,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 currentBlockSchedules = bundle.currentBlock,
                 displayBlockSchedulesList = bundle.displayBlocks,
                 selectedDateEvent = bundle.selectedEvent,
+                selectedDateAdditionalEvents = bundle.selectedAdditionalEvents,
                 selectedDateMemo = bundle.selectedMemo
             )
         }
@@ -582,6 +585,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 currentBlockSchedules = bundle.currentBlock,
                 displayBlockSchedulesList = bundle.displayBlocks,
                 selectedDateEvent = bundle.selectedEvent,
+                selectedDateAdditionalEvents = bundle.selectedAdditionalEvents,
                 selectedDateMemo = bundle.selectedMemo
             )
         }
@@ -609,6 +613,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 currentBlockSchedules = bundle.currentBlock,
                 displayBlockSchedulesList = bundle.displayBlocks,
                 selectedDateEvent = bundle.selectedEvent,
+                selectedDateAdditionalEvents = bundle.selectedAdditionalEvents,
                 selectedDateMemo = bundle.selectedMemo
             )
         }
@@ -637,6 +642,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                     currentBlockSchedules = bundle.currentBlock,
                     displayBlockSchedulesList = bundle.displayBlocks,
                     selectedDateEvent = bundle.selectedEvent,
+                    selectedDateAdditionalEvents = bundle.selectedAdditionalEvents,
                     selectedDateMemo = bundle.selectedMemo
                 )
             }
@@ -735,7 +741,6 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
             com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
             refreshSchedules()
-            checkForAppUpdate()
         }
     }
 
@@ -986,15 +991,23 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
 
+        val targetVersion = updateInfo.version.trim()
         if (updateInfo.isNewerThan(currentVersion)) {
             val ignoredVersion = repository.getIgnoredUpdateVersion()
-            if (manual || ignoredVersion != updateInfo.version.trim()) {
-                _uiState.update {
-                    it.copy(
-                        showAppUpdateDialog = true,
-                        pendingAppUpdate = updateInfo
-                    )
+            if (!manual) {
+                if (_uiState.value.showAppUpdateDialog ||
+                    shownAutoUpdateVersionInSession == targetVersion ||
+                    ignoredVersion == targetVersion
+                ) {
+                    return
                 }
+                shownAutoUpdateVersionInSession = targetVersion
+            }
+            _uiState.update {
+                it.copy(
+                    showAppUpdateDialog = true,
+                    pendingAppUpdate = updateInfo
+                )
             }
         } else if (manual) {
             _uiState.update {
@@ -1040,6 +1053,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update {
             it.copy(
                 selectedDateEvent = schedule.event,
+                selectedDateAdditionalEvents = schedule.additionalEvents,
                 selectedDateMemo = schedule.memo
             )
         }
@@ -1050,6 +1064,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         val currentBlock: List<DaySchedule>,
         val displayBlocks: List<List<DaySchedule>>,
         val selectedEvent: String,
+        val selectedAdditionalEvents: List<AdditionalEventDisplayItem>,
         val selectedMemo: String
     )
 
@@ -1087,6 +1102,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             currentBlock = currentBlock,
             displayBlocks = displayBlocks,
             selectedEvent = selectedSched.event,
+            selectedAdditionalEvents = selectedSched.additionalEvents,
             selectedMemo = selectedSched.memo
         )
     }
@@ -1107,6 +1123,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 currentBlockSchedules = bundle.currentBlock,
                 displayBlockSchedulesList = bundle.displayBlocks,
                 selectedDateEvent = bundle.selectedEvent,
+                selectedDateAdditionalEvents = bundle.selectedAdditionalEvents,
                 selectedDateMemo = bundle.selectedMemo
             )
         }

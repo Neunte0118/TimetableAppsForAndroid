@@ -10,16 +10,59 @@ object CsvParser {
      */
     fun parseRawCsv(text: String): List<List<String>> {
         val rows = mutableListOf<List<String>>()
-        if (text.isBlank()) return rows
+        val cleanText = text.removePrefix("\uFEFF")
+        if (cleanText.isBlank()) return rows
 
-        val lines = splitCsvLines(text)
+        val lines = splitCsvLines(cleanText)
+        val preferTsv = lines.firstOrNull { it.isNotBlank() }?.let { firstLine ->
+            hasUnquotedChar(firstLine, '\t')
+        } ?: false
         for (line in lines) {
-            val cells = parseCsvLine(line)
+            val cells = parseCsvLine(line, preferTsv)
             if (cells.isNotEmpty() && cells.any { it.isNotBlank() }) {
-                rows.add(cells.map { it.trim() })
+                rows.add(cells.map { it.replace("\r\n", "\n").replace("\r", "\n").trim() })
             }
         }
         return rows
+    }
+
+    private fun isAtQuotedFieldStart(sb: StringBuilder): Boolean {
+        if (sb.isEmpty()) return true
+        for (idx in sb.length - 1 downTo 0) {
+            val ch = sb[idx]
+            if (ch == '\n' || ch == '\r' || ch == ',' || ch == '\t') return true
+            if (ch != ' ') return false
+        }
+        return true
+    }
+
+    private fun hasUnquotedChar(line: String, target: Char): Boolean {
+        var insideQuote = false
+        var atFieldStart = true
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            if (c == '"') {
+                if (!insideQuote && atFieldStart) {
+                    insideQuote = true
+                    atFieldStart = false
+                } else if (insideQuote) {
+                    if (i + 1 < line.length && line[i + 1] == '"') {
+                        i++
+                    } else {
+                        insideQuote = false
+                    }
+                }
+            } else if (c == target && !insideQuote) {
+                return true
+            } else if ((c == ',' || c == '\t') && !insideQuote) {
+                atFieldStart = true
+            } else if (c != ' ' && !insideQuote) {
+                atFieldStart = false
+            }
+            i++
+        }
+        return false
     }
 
     /**
@@ -29,12 +72,25 @@ object CsvParser {
         val lines = mutableListOf<String>()
         val sb = StringBuilder()
         var insideQuote = false
+        var i = 0
 
-        for (i in csvText.indices) {
+        while (i < csvText.length) {
             val c = csvText[i]
             if (c == '"') {
-                insideQuote = !insideQuote
-                sb.append(c)
+                if (!insideQuote && isAtQuotedFieldStart(sb)) {
+                    insideQuote = true
+                    sb.append(c)
+                } else if (insideQuote) {
+                    sb.append(c)
+                    if (i + 1 < csvText.length && csvText[i + 1] == '"') {
+                        i++
+                        sb.append(csvText[i])
+                    } else {
+                        insideQuote = false
+                    }
+                } else {
+                    sb.append(c)
+                }
             } else if ((c == '\n' || c == '\r') && !insideQuote) {
                 if (c == '\r' && i + 1 < csvText.length && csvText[i + 1] == '\n') {
                     // skip '\r' in CRLF, '\n' will trigger line flush
@@ -47,6 +103,7 @@ object CsvParser {
             } else {
                 sb.append(c)
             }
+            i++
         }
         if (sb.isNotEmpty()) {
             lines.add(sb.toString())
@@ -57,9 +114,9 @@ object CsvParser {
     /**
      * Parses a single CSV/TSV line into cell values.
      */
-    private fun parseCsvLine(line: String): List<String> {
-        val hasComma = line.contains(',')
-        val hasTab = line.contains('\t')
+    private fun parseCsvLine(line: String, preferTsv: Boolean = false): List<String> {
+        val hasComma = hasUnquotedChar(line, ',')
+        val hasTab = hasUnquotedChar(line, '\t')
         if (!hasComma && !hasTab && line.contains(' ')) {
             // Space delimited line
             val tokens = mutableListOf<String>()
@@ -96,18 +153,27 @@ object CsvParser {
         val cells = mutableListOf<String>()
         val sb = StringBuilder()
         var insideQuote = false
-        val isTsv = hasTab && !hasComma
+        val isTsv = hasTab && (preferTsv || !hasComma)
         val delimiter = if (isTsv) '\t' else ','
 
         var i = 0
         while (i < line.length) {
             val c = line[i]
             if (c == '"') {
-                if (insideQuote && i + 1 < line.length && line[i + 1] == '"') {
-                    sb.append('"')
-                    i++ // Skip escaped quote
+                if (!insideQuote && sb.all { it == ' ' }) {
+                    sb.clear()
+                    insideQuote = true
+                } else if (insideQuote) {
+                    if (i + 1 < line.length && line[i + 1] == '"') {
+                        sb.append('"')
+                        i++ // Skip escaped quote
+                    } else if (i + 1 >= line.length || line[i + 1] == delimiter || line.substring(i + 1).all { it == ' ' }) {
+                        insideQuote = false
+                    } else {
+                        sb.append('"')
+                    }
                 } else {
-                    insideQuote = !insideQuote
+                    sb.append('"')
                 }
             } else if (c == delimiter && !insideQuote) {
                 cells.add(sb.toString())
@@ -238,6 +304,88 @@ object CsvParser {
         return list
     }
 
+    // 3.5. Parse 追加行事予定
+    // Headers: dates, contents, light_color, dark_color
+    fun parseAdditionalEvents(csvText: String): List<AdditionalEventRow> {
+        val rows = parseRawCsv(csvText)
+        if (rows.isEmpty()) return emptyList()
+
+        val list = mutableListOf<AdditionalEventRow>()
+        val header = rows.first().map { it.trim().lowercase() }
+        val hasHeader = header.any {
+            it.contains("date") || it.contains("日付") ||
+                it.contains("content") || it.contains("event") || it.contains("内容") ||
+                it.contains("light") || it.contains("dark") || it.contains("color")
+        }
+        val startIdx = if (hasHeader) 1 else 0
+
+        var dateIdx = 0
+        var contentsIdx = 1
+        var lightIdx = 2
+        var darkIdx = 3
+
+        if (hasHeader) {
+            val dIdx = header.indexOfFirst { it.contains("date") || it.contains("日付") }
+            if (dIdx >= 0) dateIdx = dIdx
+
+            val cIdx = header.indices.firstOrNull { idx ->
+                idx != dateIdx && (
+                    header[idx].contains("content") || header[idx].contains("event") ||
+                        header[idx].contains("内容") || header[idx].contains("行事")
+                    )
+            }
+            if (cIdx != null) contentsIdx = cIdx
+
+            val lIdx = header.indices.firstOrNull { idx ->
+                idx != dateIdx && idx != contentsIdx && header[idx].contains("light")
+            }
+            if (lIdx != null) lightIdx = lIdx
+
+            val dkIdx = header.indices.firstOrNull { idx ->
+                idx != dateIdx && idx != contentsIdx && idx != lightIdx && header[idx].contains("dark")
+            }
+            if (dkIdx != null) darkIdx = dkIdx
+        }
+
+        for (i in startIdx until rows.size) {
+            val row = rows[i]
+            if (row.isEmpty()) continue
+            val dateStr = CsvNormalizer.normalizeDate(row.getOrNull(dateIdx)?.trim() ?: "")
+            val (m, d) = parseMonthDay(dateStr) ?: continue
+            val contents = row.getOrNull(contentsIdx)
+                ?.replace(Regex("(?i)<br\\s*/?>"), "\n")
+                ?.trim()
+                ?: ""
+            if (contents.isBlank()) continue
+
+            val lightColor = normalizeHexColorString(row.getOrNull(lightIdx))
+            val darkColor = normalizeHexColorString(row.getOrNull(darkIdx))
+
+            list.add(
+                AdditionalEventRow(
+                    dateStr = dateStr,
+                    month = m,
+                    day = d,
+                    contents = contents,
+                    lightColorHex = lightColor,
+                    darkColorHex = darkColor
+                )
+            )
+        }
+        return list
+    }
+
+    private fun normalizeHexColorString(raw: String?): String {
+        val trimmed = raw?.trim() ?: return ""
+        if (trimmed.isBlank()) return ""
+        val cleaned = if (trimmed.startsWith("#")) trimmed.substring(1) else trimmed
+        return if (cleaned.matches(Regex("""[0-9a-fA-F]{6}|[0-9a-fA-F]{8}"""))) {
+            "#$cleaned"
+        } else {
+            ""
+        }
+    }
+
     // 4. Parse 祝日
     // Headers: dates, holidays
     fun parseHolidays(csvText: String): List<HolidayRow> {
@@ -298,32 +446,65 @@ object CsvParser {
     }
 
     // 6. Parse 更新情報
-    // Headers: ver/versions, info/dates/contents, link (URLは除外)
+    // Headers: ver/versions, info/dates/contents, link (URLは除外、ただし[title](url)とコードブロックは保持)
     fun parseUpdateHistory(csvText: String): List<UpdateHistoryRow> {
         val rows = parseRawCsv(csvText)
         if (rows.isEmpty()) return emptyList()
 
         val list = mutableListOf<UpdateHistoryRow>()
         val header = rows.first().map { it.trim().lowercase() }
-        val hasHeader = header.any { it.contains("ver") || it.contains("info") || it.contains("link") || it.contains("date") || it.contains("content") }
+        val hasHeader = header.any {
+            it.contains("ver") || it.contains("info") || it.contains("link") ||
+                it.contains("date") || it.contains("content") || it.contains("日付") ||
+                it.contains("内容") || it.contains("更新")
+        }
         val startIdx = if (hasHeader) 1 else 0
 
         var verCol = 0
         var infoCol = 1
         var dateCol = -1
+        var linkCol = -1
 
         if (hasHeader) {
             val v = header.indexOfFirst { it.contains("ver") }
             if (v >= 0) verCol = v
 
-            val d = header.indexOfFirst { it.contains("date") || it.contains("日付") || it.contains("日") }
-            if (d >= 0) dateCol = d
+            val l = header.indices.firstOrNull { idx -> idx != verCol && (header[idx].contains("link") || header[idx].contains("url")) }
+            if (l != null) linkCol = l
 
-            val i = header.indexOfFirst { it.contains("info") || it.contains("content") || it.contains("内容") || it.contains("更新") }
-            if (i >= 0) {
-                infoCol = i
-            } else if (dateCol >= 0) {
-                infoCol = (0 until header.size).firstOrNull { it != verCol && it != dateCol && !header[it].contains("link") } ?: 2
+            val explicitInfo = header.indices.firstOrNull { idx ->
+                idx != verCol && idx != linkCol && (
+                    header[idx].contains("info") || header[idx].contains("content") ||
+                        header[idx].contains("内容") || header[idx].contains("詳細") ||
+                        header[idx].contains("更新内容")
+                    )
+            }
+            val fallbackUpdateInfo = if (explicitInfo != null) {
+                explicitInfo
+            } else {
+                header.indices.firstOrNull { idx ->
+                    idx != verCol && idx != linkCol &&
+                        header[idx].contains("更新") &&
+                        !header[idx].contains("date") &&
+                        !header[idx].contains("日付") &&
+                        !header[idx].contains("日")
+                } ?: -1
+            }
+
+            val d = header.indices.firstOrNull { idx ->
+                idx != verCol && idx != linkCol && idx != fallbackUpdateInfo && (
+                    header[idx].contains("date") || header[idx].contains("日付") ||
+                        header[idx].contains("更新日") || header[idx] == "日"
+                    )
+            }
+            if (d != null) dateCol = d
+
+            infoCol = if (fallbackUpdateInfo >= 0) {
+                fallbackUpdateInfo
+            } else {
+                header.indices.firstOrNull { idx ->
+                    idx != verCol && idx != dateCol && idx != linkCol
+                } ?: 1
             }
         }
 
@@ -333,7 +514,7 @@ object CsvParser {
             val version = row.getOrNull(verCol)?.trim() ?: ""
             if (version.isBlank()) continue
 
-            var dateStr = if (dateCol >= 0) row.getOrNull(dateCol)?.trim() ?: "" else ""
+            var dateStr = if (dateCol >= 0 && dateCol != infoCol) row.getOrNull(dateCol)?.trim() ?: "" else ""
             var rawContents = row.getOrNull(infoCol)?.trim() ?: ""
 
             // ヘッダーがなく、3列以上かつ1列目が日付形式の場合
@@ -346,25 +527,72 @@ object CsvParser {
                 }
             }
 
-            // 「URLはいりません」: URLを除外
-            var cleanedContents = rawContents
-                .replace(Regex("""https?://\S+"""), "")
-                .trim()
-
-            // 箇条書きが連結している場合は改行で整形
-            cleanedContents = cleanedContents
-                .replace(Regex("""(?<=[^\n・])\s*・"""), "\n・")
-                .trim()
-
-            list.add(
-                UpdateHistoryRow(
-                    version = version,
-                    dateStr = dateStr,
-                    contents = cleanedContents
+            val cleanedContents = cleanUpdateContents(rawContents, stripBareUrls = true)
+            val normalizedVer = normalizeVersionKey(version)
+            val isDuplicate = list.any {
+                normalizeVersionKey(it.version) == normalizedVer &&
+                    it.dateStr == dateStr &&
+                    it.contents == cleanedContents
+            }
+            if (!isDuplicate) {
+                list.add(
+                    UpdateHistoryRow(
+                        version = version,
+                        dateStr = dateStr,
+                        contents = cleanedContents
+                    )
                 )
-            )
+            }
         }
         return list
+    }
+
+    private fun normalizeVersionKey(version: String): String {
+        return version.trim()
+            .replace(Regex("""^(version|ver|v)\s*""", RegexOption.IGNORE_CASE), "")
+            .trim()
+            .lowercase()
+    }
+
+    /**
+     * 更新内容のテキストを整形する。
+     * コードブロック (```...```) と Markdownリンク ([title](https://...)) の内部は改変せず保持し、
+     * プレーンテキスト部分の連結した「・」への改行挿入および任意の生URL除外を行う。
+     */
+    fun cleanUpdateContents(rawContents: String, stripBareUrls: Boolean = true): String {
+        val normalized = rawContents.replace("\r\n", "\n").replace("\r", "\n").trim()
+        if (normalized.isEmpty()) return ""
+
+        val protectedPattern = Regex("""```[\s\S]*?```|\[[^\]]+\]\(https?://[^\s)]+\)""")
+        val sb = StringBuilder()
+        var lastIndex = 0
+
+        for (match in protectedPattern.findAll(normalized)) {
+            if (match.range.first > lastIndex) {
+                val plainPart = normalized.substring(lastIndex, match.range.first)
+                sb.append(cleanPlainUpdateSegment(plainPart, stripBareUrls))
+            }
+            // コードブロックやMarkdownリンクはそのまま保持
+            sb.append(match.value)
+            lastIndex = match.range.last + 1
+        }
+        if (lastIndex < normalized.length) {
+            sb.append(cleanPlainUpdateSegment(normalized.substring(lastIndex), stripBareUrls))
+        }
+
+        return sb.toString()
+            .replace(Regex("""\n{3,}"""), "\n\n")
+            .trim()
+    }
+
+    private fun cleanPlainUpdateSegment(segment: String, stripBareUrls: Boolean): String {
+        var result = if (stripBareUrls) {
+            segment.replace(Regex("""https?://\S+"""), "")
+        } else {
+            segment
+        }
+        result = result.replace(Regex("""(?<=[^\n・])\s*・"""), "\n・")
+        return result
     }
 
     // Parse アプリ更新情報 (ver, info, link)
@@ -373,14 +601,48 @@ object CsvParser {
         val rows = parseRawCsv(csvText)
         if (rows.isEmpty()) return null
 
-        val startIdx = if (rows.first().getOrNull(0)?.contains("ver", ignoreCase = true) == true) 1 else 0
+        val header = rows.first().map { it.trim().lowercase() }
+        val hasHeader = header.any {
+            it.contains("ver") || it.contains("info") || it.contains("link") ||
+                it.contains("content") || it.contains("内容") || it.contains("更新")
+        }
+        val startIdx = if (hasHeader) 1 else 0
+
+        var verCol = 0
+        var infoCol = 1
+        var linkCol = 2
+
+        if (hasHeader) {
+            val v = header.indexOfFirst { it.contains("ver") }
+            if (v >= 0) verCol = v
+
+            val l = header.indices.firstOrNull { idx -> idx != verCol && (header[idx].contains("link") || header[idx].contains("url")) }
+            if (l != null) linkCol = l
+
+            val i = header.indices.firstOrNull { idx ->
+                idx != verCol && idx != linkCol && (
+                    header[idx].contains("info") || header[idx].contains("content") ||
+                        header[idx].contains("内容") || header[idx].contains("詳細") ||
+                        (header[idx].contains("更新") && !header[idx].contains("日") && !header[idx].contains("date"))
+                    )
+            }
+            if (i != null) {
+                infoCol = i
+            } else {
+                infoCol = header.indices.firstOrNull { idx ->
+                    idx != verCol && idx != linkCol && !header[idx].contains("date") && !header[idx].contains("日付")
+                } ?: 1
+            }
+        }
+
         for (i in startIdx until rows.size) {
             val row = rows[i]
             if (row.isEmpty()) continue
-            val version = row[0].trim()
-            val info = row.getOrNull(1)?.trim() ?: ""
-            val rawLink = row.getOrNull(2)?.trim() ?: ""
+            val version = row.getOrNull(verCol)?.trim() ?: ""
+            val rawInfo = row.getOrNull(infoCol)?.trim() ?: ""
+            val rawLink = row.getOrNull(linkCol)?.trim() ?: ""
             if (version.isNotBlank()) {
+                val info = cleanUpdateContents(rawInfo, stripBareUrls = false)
                 val resolvedLink = AppUpdateInfo.buildDownloadUrl(version, rawLink)
                 return AppUpdateInfo(
                     version = version,

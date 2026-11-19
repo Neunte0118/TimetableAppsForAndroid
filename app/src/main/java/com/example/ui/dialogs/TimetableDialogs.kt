@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -51,6 +52,8 @@ import com.example.data.csv.CsvSyncStatus
 import com.example.data.csv.CsvUrlsConfig
 import com.example.data.csv.UpdateHistoryRow
 import com.example.model.*
+import com.example.ui.components.RichLinkText
+import com.example.ui.components.UpdateMarkdownContent
 import com.example.ui.theme.SaturdayColor
 import com.example.ui.theme.SundayColor
 import java.time.DayOfWeek
@@ -1379,13 +1382,19 @@ fun AllEventsDialog(
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     var searchQuery by remember { mutableStateOf("") }
 
     val filteredList = remember(eventsList, searchQuery) {
         if (searchQuery.isBlank()) eventsList
         else {
             val q = searchQuery.trim().lowercase()
-            eventsList.filter { it.title.lowercase().contains(q) || it.snippet.lowercase().contains(q) || it.dayLabel.contains(q) }
+            eventsList.filter {
+                stripLinksToPlainText(it.title).lowercase().contains(q) ||
+                    it.title.lowercase().contains(q) ||
+                    it.snippet.lowercase().contains(q) ||
+                    it.dayLabel.contains(q)
+            }
         }
     }
 
@@ -1457,6 +1466,16 @@ fun AllEventsDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(filteredList) { item ->
+                            val colorHex = if (isDark) {
+                                item.darkColorHex.ifBlank { item.lightColorHex }
+                            } else {
+                                item.lightColorHex.ifBlank { item.darkColorHex }
+                            }
+                            val accentColor = parseHexColorOrNull(colorHex)
+                            val cardContainerColor = accentColor?.copy(alpha = if (isDark) 0.22f else 0.14f)
+                                ?: MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            val cardBorder = accentColor?.let { BorderStroke(1.dp, it.copy(alpha = 0.55f)) }
+
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1466,7 +1485,7 @@ fun AllEventsDialog(
                                             onDismiss()
                                         },
                                         onLongClick = {
-                                            val text = item.title.trim()
+                                            val text = stripLinksToPlainText(item.title)
                                             if (text.isNotBlank()) {
                                                 clipboardManager.setText(AnnotatedString(text))
                                             }
@@ -1474,8 +1493,9 @@ fun AllEventsDialog(
                                     ),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                                )
+                                    containerColor = cardContainerColor
+                                ),
+                                border = cardBorder
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -1484,18 +1504,23 @@ fun AllEventsDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
                                         Text(
                                             item.dayLabel,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
-                                            color = Color(0xFFE65100)
+                                            color = accentColor ?: Color(0xFFE65100)
                                         )
-                                        Text(
-                                            item.title,
+                                        RichLinkText(
+                                            text = item.title,
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            lineHeight = 19.sp,
+                                            textColor = MaterialTheme.colorScheme.onSurface,
+                                            linkColor = accentColor ?: MaterialTheme.colorScheme.primary
                                         )
                                     }
                                     Icon(
@@ -2040,6 +2065,7 @@ fun DeveloperMenuDialog(
     var electivesUrl by remember(initialConfig) { mutableStateOf(initialConfig.electivesUrl) }
     var updatesUrl by remember(initialConfig) { mutableStateOf(initialConfig.updatesUrl) }
     var eventsUrl by remember(initialConfig) { mutableStateOf(initialConfig.eventsUrl) }
+    var additionalEventsUrl by remember(initialConfig) { mutableStateOf(initialConfig.additionalEventsUrl) }
     var holidaysUrl by remember(initialConfig) { mutableStateOf(initialConfig.holidaysUrl) }
     var timetableChangeSheetUrl by remember(initialConfig) { mutableStateOf(initialConfig.timetableChangeSheetUrl) }
     var courseChangeSheetUrl by remember(initialConfig) { mutableStateOf(initialConfig.courseChangeSheetUrl) }
@@ -2149,7 +2175,7 @@ fun DeveloperMenuDialog(
 
                                     if (syncStatus.lastSyncTime != null) {
                                         Text(
-                                            text = "最終同期: ${syncStatus.lastSyncTime}  (予定:${syncStatus.commonCount}件, クラス:${syncStatus.basicCount}件, 選択:${syncStatus.electiveCount}件, 行事:${syncStatus.eventCount}件, 祝日:${syncStatus.holidayCount}件, 変更:${syncStatus.timetableChangeCount}件, 講座:${syncStatus.courseChangeCount}件, 更新:${syncStatus.updateCount}件)",
+                                            text = "最終同期: ${syncStatus.lastSyncTime}  (予定:${syncStatus.commonCount}件, クラス:${syncStatus.basicCount}件, 選択:${syncStatus.electiveCount}件, 行事:${syncStatus.eventCount}件, 追加行事:${syncStatus.additionalEventCount}件, 祝日:${syncStatus.holidayCount}件, 変更:${syncStatus.timetableChangeCount}件, 講座:${syncStatus.courseChangeCount}件, 更新:${syncStatus.updateCount}件)",
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -2169,6 +2195,7 @@ fun DeveloperMenuDialog(
                                         electivesUrl = def.electivesUrl
                                         updatesUrl = def.updatesUrl
                                         eventsUrl = def.eventsUrl
+                                        additionalEventsUrl = def.additionalEventsUrl
                                         holidaysUrl = def.holidaysUrl
                                         timetableChangeSheetUrl = def.timetableChangeSheetUrl
                                         courseChangeSheetUrl = def.courseChangeSheetUrl
@@ -2195,6 +2222,7 @@ fun DeveloperMenuDialog(
                                         electivesUrl = ""
                                         updatesUrl = ""
                                         eventsUrl = ""
+                                        additionalEventsUrl = ""
                                         holidaysUrl = ""
                                         timetableChangeSheetUrl = ""
                                         courseChangeSheetUrl = ""
@@ -2259,6 +2287,16 @@ fun DeveloperMenuDialog(
                                 singleLine = true,
                                 textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
                                 modifier = Modifier.fillMaxWidth().testTag("input_events_url")
+                            )
+
+                            // 5.5. 追加行事予定 URL
+                            OutlinedTextField(
+                                value = additionalEventsUrl,
+                                onValueChange = { additionalEventsUrl = it },
+                                label = { Text("5.5. 追加行事予定 CSV URL", fontSize = 11.sp) },
+                                singleLine = true,
+                                textStyle = LocalTextStyle.current.copy(fontSize = 11.sp),
+                                modifier = Modifier.fillMaxWidth().testTag("input_additional_events_url")
                             )
 
                             // 6. 祝日 URL
@@ -2389,6 +2427,7 @@ fun DeveloperMenuDialog(
                                     Text("・特別時程データ: ${syncStatus.specialScheduleCount}件", fontSize = 11.5.sp)
                                     Text("・選択科目データ: ${syncStatus.electiveCount}件", fontSize = 11.5.sp)
                                     Text("・行事予定データ: ${syncStatus.eventCount}件", fontSize = 11.5.sp)
+                                    Text("・追加行事予定データ: ${syncStatus.additionalEventCount}件", fontSize = 11.5.sp)
                                     Text("・祝日データ: ${syncStatus.holidayCount}件", fontSize = 11.5.sp)
                                     Text("・時間割変更データ: ${syncStatus.timetableChangeCount}件", fontSize = 11.5.sp)
                                     Text("・講座変更データ: ${syncStatus.courseChangeCount}件", fontSize = 11.5.sp)
@@ -2449,6 +2488,7 @@ fun DeveloperMenuDialog(
                                 electivesUrl = electivesUrl,
                                 updatesUrl = updatesUrl,
                                 eventsUrl = eventsUrl,
+                                additionalEventsUrl = additionalEventsUrl,
                                 holidaysUrl = holidaysUrl,
                                 timetableChangeSheetUrl = timetableChangeSheetUrl,
                                 courseChangeSheetUrl = courseChangeSheetUrl,
@@ -3039,11 +3079,11 @@ fun UpdateHistoryDialog(
                                     }
                                 }
                                 if (history.contents.isNotBlank()) {
-                                    Text(
+                                    UpdateMarkdownContent(
                                         text = history.contents,
                                         fontSize = 13.sp,
                                         lineHeight = 19.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        textColor = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -3107,57 +3147,49 @@ fun AppUpdateModalDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(4.dp)
                         ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = "v${updateInfo.version}",
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
+                            val displayVer = if (updateInfo.version.startsWith("v", ignoreCase = true)) {
+                                updateInfo.version
+                            } else {
+                                "v${updateInfo.version}"
                             }
                             Text(
-                                text = "最新バージョン",
+                                text = displayVer,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
+                        Text(
+                            text = "最新バージョン",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
-                        if (updateInfo.info.isNotBlank()) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                            Text(
-                                text = "更新内容:",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = updateInfo.info,
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    if (updateInfo.info.isNotBlank()) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        UpdateMarkdownContent(
+                            text = updateInfo.info,
+                            fontSize = 13.sp,
+                            lineHeight = 19.sp,
+                            textColor = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
 
