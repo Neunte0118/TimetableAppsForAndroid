@@ -77,12 +77,29 @@ class TimetableRepository(private val context: Context) {
     // In-memory cache for DaySchedule to enable instant date switching (<1ms)
     private val dayScheduleCache = java.util.concurrent.ConcurrentHashMap<String, DaySchedule>()
 
+    init {
+        csvSyncManager.onDataUpdated = { clearScheduleCache() }
+    }
+
     fun clearScheduleCache() {
         dayScheduleCache.clear()
     }
 
     val csvUrlsConfig: StateFlow<CsvUrlsConfig> = csvSyncManager.urlsConfig
     val csvSyncStatus: StateFlow<CsvSyncStatus> = csvSyncManager.syncStatus
+    val dataFetchMode: StateFlow<DataFetchMode> = csvSyncManager.dataFetchMode
+
+    fun setDataFetchMode(mode: DataFetchMode) {
+        csvSyncManager.setDataFetchMode(mode)
+    }
+
+    fun isBatteryOptimizationPromptDismissed(): Boolean {
+        return prefs.getBoolean("battery_optimization_prompt_dismissed", false)
+    }
+
+    fun setBatteryOptimizationPromptDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean("battery_optimization_prompt_dismissed", dismissed).apply()
+    }
 
     private fun loadDeveloperMode(): Boolean {
         return prefs.getBoolean("is_developer_mode", false)
@@ -374,13 +391,20 @@ class TimetableRepository(private val context: Context) {
         csvSyncManager.saveUrlsConfig(config)
     }
 
-    suspend fun syncCsvData(force: Boolean = false): Result<String> {
+    suspend fun syncCsvData(force: Boolean = true): Result<String> {
         clearScheduleCache()
         val res = csvSyncManager.syncAllCsvs(force)
         clearScheduleCache()
+        if (_isNextClassNotificationEnabled.value) {
+            NotificationHelper.scheduleNextClassAlarms(context)
+        }
         TimetableWidgetProvider.updateAllWidgets(context)
         EventMemoWidgetProvider.updateAllWidgets(context)
         return res
+    }
+
+    suspend fun refreshUpdateInfo(): Result<Unit> {
+        return csvSyncManager.syncUpdatesOnly()
     }
 
     fun clearAllCsvCache() {

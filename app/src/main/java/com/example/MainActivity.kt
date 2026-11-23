@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.example.notification.NotificationHelper
+import com.example.sync.BackgroundSyncScheduler
 import com.example.ui.TimetableScreen
 import com.example.ui.TimetableViewModel
 import com.example.ui.theme.MyApplicationTheme
@@ -47,9 +48,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Ensure notification channel is created
+        // Ensure notification channel is created and periodic background sync is scheduled
         NotificationHelper.createNotificationChannel(applicationContext)
         NotificationHelper.scheduleNextClassAlarms(applicationContext)
+        BackgroundSyncScheduler.schedulePeriodicSync(applicationContext)
 
         // Request notification permission if needed on Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -73,6 +75,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        viewModel.refreshOnAppForeground()
     }
 }
 

@@ -30,6 +30,14 @@ enum class TimetableFontSize(val label: String, val subjectSp: Float, val classr
     LARGE("大", 16f, 14f)
 }
 
+/**
+ * データ取得の通信環境設定
+ */
+enum class DataFetchMode(val label: String) {
+    WIFI_ONLY("Wi-Fiのみ"),
+    INCLUDE_MOBILE("モバイル通信含む")
+}
+
 data class ClassGroup(
     val id: String,
     val name: String,

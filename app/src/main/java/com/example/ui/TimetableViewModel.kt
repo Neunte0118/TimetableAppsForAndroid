@@ -12,6 +12,7 @@ import com.example.data.csv.CsvUrlsConfig
 import com.example.data.csv.UpdateHistoryRow
 import com.example.model.*
 import com.example.notification.NotificationHelper
+import com.example.sync.BatteryOptimizationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -107,6 +108,10 @@ data class TimetableUiState(
     val showOtherMenuSheet: Boolean = false,
     val showAppUpdateDialog: Boolean = false,
     val pendingAppUpdate: AppUpdateInfo? = null,
+    val dataFetchMode: DataFetchMode = DataFetchMode.INCLUDE_MOBILE,
+    val isIgnoringBatteryOptimizations: Boolean = false,
+    val showBatteryOptimizationDialog: Boolean = false,
+    val showDataFetchSettingsDialog: Boolean = false,
     val externalUrlToOpen: String? = null,
     val infoMessage: String? = null
 )
@@ -143,6 +148,8 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             nextClassLeadMinutes = repository.nextClassLeadMinutes.value,
             csvUrlsConfig = repository.csvUrlsConfig.value,
             csvSyncStatus = repository.csvSyncStatus.value,
+            dataFetchMode = repository.dataFetchMode.value,
+            isIgnoringBatteryOptimizations = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(application),
             onboardingStep = if (!repository.hasCompletedInitialSetup()) OnboardingStep.TERMS else OnboardingStep.NONE,
             updateHistories = repository.getUpdateHistories()
         )
@@ -151,6 +158,8 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val dismissedUnselectedClassesInSession = mutableSetOf<String>()
     private var shownAutoUpdateVersionInSession: String? = null
+    private var lastLaunchOrResumeSyncMs: Long = 0L
+    private var hasCheckedBatteryPromptInSession = false
 
     init {
         // Collect repository states
@@ -233,10 +242,15 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        // Collect CSV configs and status
+        // Collect CSV configs, data fetch mode, and status
         viewModelScope.launch {
             repository.csvUrlsConfig.collect { config ->
                 _uiState.update { it.copy(csvUrlsConfig = config) }
+            }
+        }
+        viewModelScope.launch {
+            repository.dataFetchMode.collect { mode ->
+                _uiState.update { it.copy(dataFetchMode = mode) }
             }
         }
         viewModelScope.launch {
@@ -260,6 +274,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
                 if (!status.isSyncing) {
+                    repository.clearScheduleCache()
                     checkForAppUpdate()
                     checkAndShowElectivesModalIfUnselected()
                 }
@@ -280,22 +295,94 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
                 if (now.toLocalDate() != prevDate) {
-                    // Date changed (midnight transition): re-sync daily CSVs (e.g. changed timetable)
-                    repository.syncCsvData(force = false)
+                    // Date changed (midnight transition): fetch latest CSVs immediately
+                    lastLaunchOrResumeSyncMs = System.currentTimeMillis()
+                    repository.syncCsvData(force = true)
                     refreshSchedules()
                 }
                 delay(1000)
             }
         }
 
-        // Sync CSV at start (respects daily / weekly intervals)
+        // Always fetch latest timetable & update information immediately on app launch
+        lastLaunchOrResumeSyncMs = System.currentTimeMillis()
         viewModelScope.launch {
-            repository.syncCsvData(force = false)
+            repository.syncCsvData(force = true)
         }
 
+        // Also run a periodic 60-minute refresh while the app remains open in foreground
+        viewModelScope.launch {
+            val intervalMillis = com.example.sync.BackgroundSyncScheduler.SYNC_INTERVAL_MILLIS
+            while (true) {
+                delay(intervalMillis)
+                val now = System.currentTimeMillis()
+                if (now - lastLaunchOrResumeSyncMs >= intervalMillis &&
+                    !_uiState.value.csvSyncStatus.isSyncing
+                ) {
+                    lastLaunchOrResumeSyncMs = now
+                    repository.syncCsvData(force = true)
+                }
+            }
+        }
+
+        checkAndShowBatteryOptimizationModalOnStartup()
         checkAndShowElectivesModalIfUnselected()
 
         refreshSchedules()
+    }
+
+    fun refreshOnAppForeground() {
+        refreshBatteryOptimizationStatus()
+        val now = System.currentTimeMillis()
+        if (_uiState.value.csvSyncStatus.isSyncing) return
+        if (now - lastLaunchOrResumeSyncMs < 2000L) return
+        lastLaunchOrResumeSyncMs = now
+        viewModelScope.launch {
+            repository.syncCsvData(force = true)
+        }
+    }
+
+    fun refreshBatteryOptimizationStatus() {
+        val ignoring = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(getApplication())
+        _uiState.update { it.copy(isIgnoringBatteryOptimizations = ignoring) }
+    }
+
+    fun checkAndShowBatteryOptimizationModalOnStartup() {
+        if (!repository.hasCompletedInitialSetup()) return
+        if (hasCheckedBatteryPromptInSession) return
+        hasCheckedBatteryPromptInSession = true
+        val ignoring = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(getApplication())
+        _uiState.update { it.copy(isIgnoringBatteryOptimizations = ignoring) }
+        if (!ignoring && !repository.isBatteryOptimizationPromptDismissed()) {
+            _uiState.update { it.copy(showBatteryOptimizationDialog = true) }
+        }
+    }
+
+    fun openBatteryOptimizationDialog() {
+        refreshBatteryOptimizationStatus()
+        _uiState.update { it.copy(showBatteryOptimizationDialog = true, showOtherMenuSheet = false) }
+    }
+
+    fun dismissBatteryOptimizationDialog(dontShowAgain: Boolean) {
+        if (dontShowAgain) {
+            repository.setBatteryOptimizationPromptDismissed(true)
+        }
+        _uiState.update { it.copy(showBatteryOptimizationDialog = false) }
+        checkForAppUpdate(manual = false)
+        checkAndShowElectivesModalIfUnselected()
+    }
+
+    fun openDataFetchSettingsDialog() {
+        _uiState.update { it.copy(showDataFetchSettingsDialog = true, showOtherMenuSheet = false) }
+    }
+
+    fun closeDataFetchSettingsDialog() {
+        _uiState.update { it.copy(showDataFetchSettingsDialog = false) }
+    }
+
+    fun setDataFetchMode(mode: DataFetchMode) {
+        repository.setDataFetchMode(mode)
+        _uiState.update { it.copy(dataFetchMode = mode) }
     }
 
     fun selectDate(date: LocalDate) {
@@ -721,14 +808,16 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun syncCsvData(force: Boolean = true) {
         viewModelScope.launch {
+            val isWifiOnlyBlocked = repository.dataFetchMode.value == DataFetchMode.WIFI_ONLY &&
+                !repository.csvSyncManager.isWifiConnected()
             val result = repository.syncCsvData(force)
             val selectedClass = _uiState.value.selectedClass
             val options = repository.csvSyncManager.getElectiveOptionsForClass(selectedClass.id)
             val userChoices = repository.getElectiveSelectionsForClass(selectedClass.id)
-            val infoMsg = if (result.isSuccess) {
-                "時間割データを最新に更新しました"
-            } else {
-                "インターネットに接続されていません 事前に取得したデータを表示しています"
+            val infoMsg = when {
+                isWifiOnlyBlocked -> "Wi-Fi未接続のためデータ取得をスキップしました（設定: Wi-Fiのみ）"
+                result.isSuccess -> "時間割データを最新に更新しました"
+                else -> "インターネットに接続されていません 事前に取得したデータを表示しています"
             }
             _uiState.update {
                 it.copy(
@@ -767,7 +856,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
             }
             if (!isSyncing) {
                 viewModelScope.launch {
-                    repository.syncCsvData()
+                    repository.syncCsvData(force = true)
                 }
             }
         } else {
@@ -802,6 +891,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update { it.copy(onboardingStep = OnboardingStep.NONE) }
         com.example.widget.TimetableWidgetProvider.updateAllWidgets(getApplication())
         com.example.widget.EventMemoWidgetProvider.updateAllWidgets(getApplication())
+        checkAndShowBatteryOptimizationModalOnStartup()
     }
 
     fun updateElectiveChoice(origin: String, elective: String) {
@@ -884,6 +974,7 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun checkAndShowElectivesModalIfUnselected(targetClassId: String = _uiState.value.selectedClass.id) {
         if (!repository.hasCompletedInitialSetup()) return
+        if (_uiState.value.showBatteryOptimizationDialog) return
         if (dismissedUnselectedClassesInSession.contains(targetClassId)) return
         if (hasUnselectedElectivesForClass(targetClassId)) {
             val options = repository.csvSyncManager.getElectiveOptionsForClass(targetClassId)
@@ -920,6 +1011,11 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun openHistoryDialog() {
         _uiState.update { it.copy(showHistoryDialog = true, showOtherMenuSheet = false) }
+        viewModelScope.launch {
+            repository.refreshUpdateInfo().onSuccess {
+                _uiState.update { it.copy(updateHistories = repository.getUpdateHistories()) }
+            }
+        }
     }
 
     fun closeHistoryDialog() {
@@ -979,6 +1075,18 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun checkForAppUpdate(manual: Boolean = false) {
+        if (manual) {
+            viewModelScope.launch {
+                val refreshResult = repository.refreshUpdateInfo()
+                _uiState.update { it.copy(updateHistories = repository.getUpdateHistories()) }
+                evaluateAppUpdate(manual = true, fetchFailed = refreshResult.isFailure)
+            }
+        } else {
+            evaluateAppUpdate(manual = false, fetchFailed = false)
+        }
+    }
+
+    private fun evaluateAppUpdate(manual: Boolean, fetchFailed: Boolean) {
         val updateInfo = repository.getLatestAppUpdateInfo()
         val currentVersion = BuildConfig.VERSION_NAME.trim()
 
@@ -995,7 +1103,8 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
         if (updateInfo.isNewerThan(currentVersion)) {
             val ignoredVersion = repository.getIgnoredUpdateVersion()
             if (!manual) {
-                if (_uiState.value.showAppUpdateDialog ||
+                if (_uiState.value.showBatteryOptimizationDialog ||
+                    _uiState.value.showAppUpdateDialog ||
                     shownAutoUpdateVersionInSession == targetVersion ||
                     ignoredVersion == targetVersion
                 ) {
@@ -1010,8 +1119,13 @@ class TimetableViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
         } else if (manual) {
+            val msg = if (fetchFailed) {
+                "最新の更新情報を取得できませんでした（キャッシュ: v$currentVersion）"
+            } else {
+                "お使いのアプリ (v$currentVersion) は最新バージョンです"
+            }
             _uiState.update {
-                it.copy(infoMessage = "お使いのアプリ (v$currentVersion) は最新バージョンです")
+                it.copy(infoMessage = msg)
             }
         }
     }

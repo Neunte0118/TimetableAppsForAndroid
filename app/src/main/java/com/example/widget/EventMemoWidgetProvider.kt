@@ -124,7 +124,7 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         val repo = TimetableRepository.getInstance(context)
-                        repo.syncCsvData(force = false)
+                        repo.syncCsvData(force = true)
                     } catch (_: Exception) {
                     }
                 }
@@ -137,6 +137,7 @@ class EventMemoWidgetProvider : AppWidgetProvider() {
             AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
                 updateAllWidgets(context)
                 scheduleAlarms(context)
+                com.example.sync.BackgroundSyncScheduler.schedulePeriodicSync(context)
             }
         }
     }

@@ -3252,6 +3252,328 @@ fun AppUpdateModalDialog(
 }
 
 /**
+ * 起動時 バッテリー最適化除外設定のお願いモーダル & データ取得設定選択
+ */
+@Composable
+fun BatteryOptimizationExclusionDialog(
+    currentDataFetchMode: DataFetchMode,
+    isIgnoringBatteryOptimizations: Boolean,
+    onOpenBatterySettings: () -> Unit,
+    onSelectDataFetchMode: (DataFetchMode) -> Unit,
+    onDismiss: (dontShowAgain: Boolean) -> Unit
+) {
+    var dontShowAgain by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { onDismiss(dontShowAgain) },
+        modifier = Modifier.testTag("battery_optimization_dialog"),
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.BatteryChargingFull,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "バッテリー最適化除外設定のお願い",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "時間割アプリはバックグラウンドで最新のデータを取得します。しかしながら、バッテリー最適化が有効だと、取得タイミングが遅れることがあるため、最新のデータが必ず更新される保証ができなくなります。\nバッテリー最適化除外設定をすることで、スケジュール通りに取得できます。",
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                if (isIgnoringBatteryOptimizations) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "現在：バッテリー最適化から除外済みです",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = onOpenBatterySettings,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("open_battery_optimization_settings_button"),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.BatterySaver,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "バッテリー最適化除外設定を開く",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.5.sp
+                    )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                Text(
+                    text = "なお、時間割アプリは60分に1回、Wi-Fi環境であるかを確認し、更新頻度が低いデータ(約24KB)はWi-Fi環境でのみ取得しています。（更新頻度が高いデータ(約68KB)はモバイル通信でも関係なく取得します。）\nデータ通信量が気になる方は、すべてWi-Fi環境でのみ取得するように切り替えることも可能ですが、モバイル通信でもデータを取得することを推奨します。",
+                    fontSize = 12.5.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "データ取得",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    DataFetchModeSegmentedSelector(
+                        currentMode = currentDataFetchMode,
+                        onSelectMode = onSelectDataFetchMode,
+                        wifiTestTag = "data_fetch_mode_wifi_only",
+                        mobileTestTag = "data_fetch_mode_include_mobile"
+                    )
+
+                    Text(
+                        text = "※設定から変更できます。",
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { dontShowAgain = !dontShowAgain }
+                        .padding(vertical = 4.dp)
+                        .testTag("battery_dont_show_again_row")
+                ) {
+                    Checkbox(
+                        checked = dontShowAgain,
+                        onCheckedChange = { dontShowAgain = it },
+                        modifier = Modifier.testTag("battery_dont_show_again_checkbox")
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "二度と表示しない",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onDismiss(dontShowAgain) },
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("close_battery_optimization_dialog_button")
+            ) {
+                Text("閉じる", fontWeight = FontWeight.SemiBold)
+            }
+        }
+    )
+}
+
+@Composable
+fun DataFetchModeSegmentedSelector(
+    currentMode: DataFetchMode,
+    onSelectMode: (DataFetchMode) -> Unit,
+    wifiTestTag: String = "data_fetch_mode_wifi_only",
+    mobileTestTag: String = "data_fetch_mode_include_mobile"
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            listOf(
+                DataFetchMode.WIFI_ONLY to wifiTestTag,
+                DataFetchMode.INCLUDE_MOBILE to mobileTestTag
+            ).forEach { (mode, tag) ->
+                val isSelected = currentMode == mode
+                Surface(
+                    onClick = { onSelectMode(mode) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .testTag(tag)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = mode.label,
+                            fontSize = 12.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * データ取得設定ダイアログ（設定メニュー用）
+ */
+@Composable
+fun DataFetchSettingsDialog(
+    currentMode: DataFetchMode,
+    onSelectMode: (DataFetchMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("data_fetch_settings_dialog"),
+        icon = {
+            Icon(Icons.Outlined.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        },
+        title = {
+            Text("データ取得設定", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "60分おきのバックグラウンド更新や自動取得時の通信環境を選択できます。",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+
+                DataFetchModeSegmentedSelector(
+                    currentMode = currentMode,
+                    onSelectMode = onSelectMode,
+                    wifiTestTag = "settings_data_fetch_wifi_only",
+                    mobileTestTag = "settings_data_fetch_include_mobile"
+                )
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "・モバイル通信含む（推奨・初期設定）",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "更新頻度が高いデータ（時間割予定・時間割変更・講座変更・考査・特別時程・行事・更新情報：約68KB）はモバイル通信でも取得し、更新頻度が低いデータ（クラス別時間割・選択科目・祝日・科目対応表：約24KB）はWi-Fi環境でのみ取得します。",
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "・Wi-Fiのみ",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "すべてのCSVデータをWi-Fi接続時のみ取得し、モバイル通信量は使用しません。",
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("close_data_fetch_settings_button")
+            ) {
+                Text("閉じる")
+            }
+        }
+    )
+}
+
+/**
  * ヘルプダイアログ
  */
 @Composable
@@ -3394,6 +3716,8 @@ fun OtherMenuModalSheet(
     currentFontSize: TimetableFontSize,
     currentColumnCount: Int = 5,
     currentTableDisplayCount: Int = 1,
+    currentDataFetchMode: DataFetchMode = DataFetchMode.INCLUDE_MOBILE,
+    isIgnoringBatteryOptimizations: Boolean = false,
     onToggleDeveloperMode: () -> Unit,
     onToggleHighlightChangedPeriods: (Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -3407,6 +3731,8 @@ fun OtherMenuModalSheet(
     onOpenClassSelect: () -> Unit,
     onOpenElectives: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onOpenDataFetchSettings: () -> Unit,
+    onOpenBatteryOptimization: () -> Unit,
     onOpenDeveloperMenu: () -> Unit,
     onOpenHistory: () -> Unit,
     onCheckForAppUpdate: () -> Unit,
@@ -3596,6 +3922,32 @@ fun OtherMenuModalSheet(
                 subtitle = "毎朝の時間割通知のON/OFF・時刻変更",
                 onClick = onOpenNotificationSettings,
                 testTag = "menu_notification_settings"
+            )
+
+            MenuSheetItem(
+                icon = Icons.Outlined.Wifi,
+                iconTint = colorClass,
+                title = "データ取得設定",
+                subtitle = if (currentDataFetchMode == DataFetchMode.INCLUDE_MOBILE) {
+                    "現在: モバイル通信含む（推奨）"
+                } else {
+                    "現在: Wi-Fiのみ"
+                },
+                onClick = onOpenDataFetchSettings,
+                testTag = "menu_data_fetch_settings"
+            )
+
+            MenuSheetItem(
+                icon = Icons.Outlined.BatterySaver,
+                iconTint = colorClass,
+                title = "バッテリー最適化除外設定",
+                subtitle = if (isIgnoringBatteryOptimizations) {
+                    "現在: 除外済み"
+                } else {
+                    "現在: 未設定（バックグラウンド更新のため推奨）"
+                },
+                onClick = onOpenBatteryOptimization,
+                testTag = "menu_battery_optimization"
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))

@@ -18,12 +18,22 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = 4
-    versionName = "1.5.0"
+    versionName = "1.6.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  val localDebugKeystore = file("${rootDir}/debug.keystore")
+
   signingConfigs {
+      if (localDebugKeystore.exists()) {
+          create("debugConfig") {
+              storeFile = localDebugKeystore
+              storePassword = "android"
+              keyAlias = "androiddebugkey"
+              keyPassword = "android"
+          }
+      }
       create("release") {
           val keystorePath = providers.gradleProperty("android.injected.signing.store.file")
               .orNull
@@ -38,6 +48,11 @@ android {
   }
   
   buildTypes {
+      debug {
+          signingConfigs.findByName("debugConfig")?.let {
+              signingConfig = it
+          }
+      }
       release {
           isCrunchPngs = false
           isMinifyEnabled = false

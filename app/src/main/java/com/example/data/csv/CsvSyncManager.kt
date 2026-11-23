@@ -2,7 +2,10 @@ package com.example.data.csv
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.example.model.ClassGroup
+import com.example.model.DataFetchMode
 import com.example.model.DefaultSchoolData
 import com.example.model.PeriodSchedule
 import com.example.model.SubjectColorDefaults
@@ -14,7 +17,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.time.DayOfWeek
@@ -26,8 +32,11 @@ import java.util.concurrent.TimeUnit
 
 class CsvSyncManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("csv_sync_prefs", Context.MODE_PRIVATE)
+    private val syncMutex = Mutex()
+    var onDataUpdated: (() -> Unit)? = null
 
     private val httpClient = OkHttpClient.Builder()
+        .cache(null)
         .dispatcher(okhttp3.Dispatcher().apply {
             maxRequests = 24
             maxRequestsPerHost = 20
@@ -39,8 +48,11 @@ class CsvSyncManager(private val context: Context) {
         .build()
 
     companion object {
+        const val INTERVAL_60_MINUTES_MILLIS = 60L * 60 * 1000
         const val INTERVAL_WEEK_MILLIS = 7L * 24 * 60 * 60 * 1000
         const val INTERVAL_DAY_MILLIS = 24L * 60 * 60 * 1000
+
+        const val KEY_DATA_FETCH_MODE = "data_fetch_mode"
 
         const val KEY_TS_HOLIDAYS = "sync_ts_holidays"
         const val KEY_TS_BASIC_CLASS = "sync_ts_basic_class"
@@ -60,9 +72,15 @@ class CsvSyncManager(private val context: Context) {
         val SATURDAY_LECTURE_ORIGINS = listOf("土曜講習①", "土曜講習②", "土曜講習③", "土曜講習④")
     }
 
+    @androidx.annotation.VisibleForTesting
+    var wifiStateOverrideForTesting: Boolean? = null
+
     // Config & Status Flows
     private val _urlsConfig = MutableStateFlow(loadUrlsConfig())
     val urlsConfig: StateFlow<CsvUrlsConfig> = _urlsConfig.asStateFlow()
+
+    private val _dataFetchMode = MutableStateFlow(loadDataFetchMode())
+    val dataFetchMode: StateFlow<DataFetchMode> = _dataFetchMode.asStateFlow()
 
     private val _syncStatus = MutableStateFlow(loadSyncStatus())
     val syncStatus: StateFlow<CsvSyncStatus> = _syncStatus.asStateFlow()
@@ -277,6 +295,44 @@ class CsvSyncManager(private val context: Context) {
         _urlsConfig.value = updatedConfig
     }
 
+    private fun loadDataFetchMode(): DataFetchMode {
+        val raw = prefs.getString(KEY_DATA_FETCH_MODE, DataFetchMode.INCLUDE_MOBILE.name)
+        return try {
+            if (raw != null) DataFetchMode.valueOf(raw) else DataFetchMode.INCLUDE_MOBILE
+        } catch (_: Exception) {
+            DataFetchMode.INCLUDE_MOBILE
+        }
+    }
+
+    fun setDataFetchMode(mode: DataFetchMode) {
+        prefs.edit().putString(KEY_DATA_FETCH_MODE, mode.name).apply()
+        _dataFetchMode.value = mode
+    }
+
+    fun isWifiConnected(): Boolean {
+        wifiStateOverrideForTesting?.let { return it }
+        return try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return false
+            val activeNetwork = cm.activeNetwork ?: return false
+            val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun shouldFetchOnCurrentNetwork(
+        isWifiOnlyCsv: Boolean,
+        wifiConnected: Boolean = isWifiConnected(),
+        mode: DataFetchMode = _dataFetchMode.value
+    ): Boolean {
+        return when (mode) {
+            DataFetchMode.WIFI_ONLY -> wifiConnected
+            DataFetchMode.INCLUDE_MOBILE -> if (isWifiOnlyCsv) wifiConnected else true
+        }
+    }
+
     private fun loadSyncStatus(): CsvSyncStatus {
         return CsvSyncStatus(
             isSyncing = false,
@@ -401,32 +457,50 @@ class CsvSyncManager(private val context: Context) {
     }
 
     /**
-     * Downloads CSVs with 1-week and 1-day intervals.
+     * Downloads CSVs every 60 minutes (or immediately when force = true).
+     * Wi-Fi-only CSVs (basicClass, secondTermClass, electives, holidays, subjectMapping) are only
+     * fetched over Wi-Fi. When DataFetchMode is WIFI_ONLY, all CSVs require Wi-Fi.
      */
-    suspend fun syncAllCsvs(force: Boolean = false): Result<String> = withContext(Dispatchers.IO) {
-        _syncStatus.value = _syncStatus.value.copy(isSyncing = true, lastSyncMessage = "CSVデータをダウンロード中...")
+    suspend fun syncAllCsvs(force: Boolean = true): Result<String> = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            _syncStatus.value = _syncStatus.value.copy(isSyncing = true, lastSyncMessage = "CSVデータをダウンロード中...")
 
-        val config = _urlsConfig.value
-        val errors = mutableListOf<String>()
-        var updatedCount = 0
-        val now = System.currentTimeMillis()
+            val config = _urlsConfig.value
+            val errors = mutableListOf<String>()
+            var updatedCount = 0
+            val now = System.currentTimeMillis()
+            val wifiConnected = isWifiConnected()
+            val fetchMode = _dataFetchMode.value
 
-        // 1週間に1回取得するグループ: 祝日、前期クラス別時間割、後期クラス別時間割、科目対応表
-        val fetchHolidays = shouldFetchCsv("csv_cache_holidays", KEY_TS_HOLIDAYS, INTERVAL_WEEK_MILLIS, force)
-        val fetchBasic = shouldFetchCsv("csv_cache_basic_class", KEY_TS_BASIC_CLASS, INTERVAL_WEEK_MILLIS, force)
-        val fetchSecondTerm = shouldFetchCsv("csv_cache_second_term_class", KEY_TS_SECOND_TERM_CLASS, INTERVAL_WEEK_MILLIS, force)
-        val fetchSubjectMapping = shouldFetchCsv("csv_cache_subject_mappings", KEY_TS_SUBJECT_MAPPINGS, INTERVAL_WEEK_MILLIS, force)
+            val canFetchWifiOnlyGroup = shouldFetchOnCurrentNetwork(
+                isWifiOnlyCsv = true,
+                wifiConnected = wifiConnected,
+                mode = fetchMode
+            )
+            val canFetchMobileAllowedGroup = shouldFetchOnCurrentNetwork(
+                isWifiOnlyCsv = false,
+                wifiConnected = wifiConnected,
+                mode = fetchMode
+            )
 
-        // それ以外は1日に1回取得するグループ
-        val fetchCommon = shouldFetchCsv("csv_cache_common_schedule", KEY_TS_COMMON_SCHEDULE, INTERVAL_DAY_MILLIS, force)
-        val fetchElectives = shouldFetchCsv("csv_cache_electives", KEY_TS_ELECTIVES, INTERVAL_DAY_MILLIS, force)
-        val fetchUpdates = shouldFetchCsv("csv_cache_updates", KEY_TS_UPDATES, INTERVAL_DAY_MILLIS, force)
-        val fetchEvents = shouldFetchCsv("csv_cache_events", KEY_TS_EVENTS, INTERVAL_DAY_MILLIS, force)
-        val fetchAdditionalEvents = shouldFetchCsv("csv_cache_additional_events", KEY_TS_ADDITIONAL_EVENTS, INTERVAL_DAY_MILLIS, force)
-        val fetchTimetableChanges = shouldFetchCsv("csv_cache_timetable_changes", KEY_TS_TIMETABLE_CHANGES, INTERVAL_DAY_MILLIS, force)
-        val fetchCourseChanges = shouldFetchCsv("csv_cache_course_changes", KEY_TS_COURSE_CHANGES, INTERVAL_DAY_MILLIS, force)
-        val fetchExam = shouldFetchCsv("csv_cache_exam_schedule", KEY_TS_EXAM_SCHEDULE, INTERVAL_DAY_MILLIS, force)
-        val fetchSpecial = shouldFetchCsv("csv_cache_special_schedule", KEY_TS_SPECIAL_SCHEDULE, INTERVAL_DAY_MILLIS, force)
+            // すべてのCSVを60分間隔で取得判定。ただし低頻度グループはWi-Fi環境でのみ取得
+            val fetchHolidays = canFetchWifiOnlyGroup && shouldFetchCsv("csv_cache_holidays", KEY_TS_HOLIDAYS, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchBasic = canFetchWifiOnlyGroup && shouldFetchCsv("csv_cache_basic_class", KEY_TS_BASIC_CLASS, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchSecondTerm = canFetchWifiOnlyGroup && shouldFetchCsv("csv_cache_second_term_class", KEY_TS_SECOND_TERM_CLASS, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchSubjectMapping = canFetchWifiOnlyGroup && shouldFetchCsv("csv_cache_subject_mappings", KEY_TS_SUBJECT_MAPPINGS, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchElectives = canFetchWifiOnlyGroup && shouldFetchCsv("csv_cache_electives", KEY_TS_ELECTIVES, INTERVAL_60_MINUTES_MILLIS, force)
+
+            // 高頻度グループは設定が「モバイル通信含む」ならモバイル通信でも取得、「Wi-Fiのみ」ならWi-Fi環境でのみ取得
+            val fetchCommon = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_common_schedule", KEY_TS_COMMON_SCHEDULE, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchUpdates = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_updates", KEY_TS_UPDATES, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchEvents = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_events", KEY_TS_EVENTS, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchAdditionalEvents = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_additional_events", KEY_TS_ADDITIONAL_EVENTS, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchTimetableChanges = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_timetable_changes", KEY_TS_TIMETABLE_CHANGES, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchCourseChanges = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_course_changes", KEY_TS_COURSE_CHANGES, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchExam = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_exam_schedule", KEY_TS_EXAM_SCHEDULE, INTERVAL_60_MINUTES_MILLIS, force)
+            val fetchSpecial = canFetchMobileAllowedGroup && shouldFetchCsv("csv_cache_special_schedule", KEY_TS_SPECIAL_SCHEDULE, INTERVAL_60_MINUTES_MILLIS, force)
+
+            val skippedDueToWifi = !canFetchWifiOnlyGroup || !canFetchMobileAllowedGroup
 
         coroutineScope {
             val commonDeferred = if (fetchCommon && config.commonScheduleUrl.isNotBlank()) {
@@ -604,15 +678,19 @@ class CsvSyncManager(private val context: Context) {
 
         if (updatedCount > 0) {
             rebuildIndexMaps()
+            onDataUpdated?.invoke()
         } else if (errors.isEmpty()) {
             loadAndParseLocalData()
+            onDataUpdated?.invoke()
         }
 
         val nowStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("M/d HH:mm:ss", Locale.JAPANESE))
         val isSuccess = errors.isEmpty()
         val message = when {
+            updatedCount > 0 && errors.isEmpty() && skippedDueToWifi -> "${updatedCount}種類のCSV同期に成功しました（Wi-Fi限定分は待機） - $nowStr"
             updatedCount > 0 && errors.isEmpty() -> "${updatedCount}種類のCSV同期に成功しました - $nowStr"
             updatedCount > 0 && errors.isNotEmpty() -> "${updatedCount}種類のCSV同期に成功しました 一部未更新 - $nowStr"
+            errors.isEmpty() && fetchMode == DataFetchMode.WIFI_ONLY && !wifiConnected -> "Wi-Fi未接続のため同期をスキップしました（設定: Wi-Fiのみ） - $nowStr"
             errors.isEmpty() -> "最新のキャッシュデータを利用しています - $nowStr"
             else -> "インターネットに接続されていません キャッシュデータを表示しています"
         }
@@ -644,20 +722,52 @@ class CsvSyncManager(private val context: Context) {
         )
 
         if (isSuccess) Result.success(message) else Result.failure(Exception(message))
+        }
+    }
+
+    /**
+     * Always fetches the latest update information CSV from the network (respecting WIFI_ONLY mode).
+     */
+    suspend fun syncUpdatesOnly(): Result<Unit> = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            if (!shouldFetchOnCurrentNetwork(isWifiOnlyCsv = false)) {
+                return@withLock Result.failure(IllegalStateException("Wi-Fi未接続のため同期をスキップしました"))
+            }
+            val url = _urlsConfig.value.updatesUrl.trim()
+            if (url.isBlank()) {
+                return@withLock Result.failure(IllegalStateException("Updates URL is blank"))
+            }
+            val res = fetchUrlContent(url)
+            res.onSuccess { text ->
+                val now = System.currentTimeMillis()
+                prefs.edit()
+                    .putString("csv_cache_updates", text)
+                    .putLong(KEY_TS_UPDATES, now)
+                    .apply()
+                updateHistories = CsvParser.parseUpdateHistory(text)
+                latestAppUpdateInfo = CsvParser.parseAppUpdateInfo(text)
+                _syncStatus.value = _syncStatus.value.copy(updateCount = updateHistories.size)
+            }
+            res.map { Unit }
+        }
     }
 
     private fun fetchUrlContent(url: String): Result<String> {
         return try {
             val request = Request.Builder()
                 .url(url)
+                .cacheControl(CacheControl.FORCE_NETWORK)
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
                 .build()
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string() ?: ""
-                Result.success(body)
-            } else {
-                Result.failure(Exception("HTTP ${response.code}"))
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    Result.success(body)
+                } else {
+                    Result.failure(Exception("HTTP ${response.code}"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

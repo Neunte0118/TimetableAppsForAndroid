@@ -35,7 +35,7 @@ class DailyTimetableReceiver : BroadcastReceiver() {
         // Trigger daily CSV sync (including changed timetable)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                repo.syncCsvData(force = false)
+                repo.syncCsvData(force = true)
             } catch (_: Exception) {
             }
         }

@@ -459,6 +459,33 @@ fun TimetableScreen(
         )
     }
 
+    // バッテリー最適化除外設定モーダル
+    if (uiState.showBatteryOptimizationDialog) {
+        BatteryOptimizationExclusionDialog(
+            currentDataFetchMode = uiState.dataFetchMode,
+            isIgnoringBatteryOptimizations = uiState.isIgnoringBatteryOptimizations,
+            onOpenBatterySettings = {
+                try {
+                    val intent = com.example.sync.BatteryOptimizationHelper.createBatteryOptimizationSettingsIntent(context)
+                    context.startActivity(intent)
+                } catch (_: Exception) {
+                    Toast.makeText(context, "設定画面を開けませんでした", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onSelectDataFetchMode = { mode -> viewModel.setDataFetchMode(mode) },
+            onDismiss = { dontShowAgain -> viewModel.dismissBatteryOptimizationDialog(dontShowAgain) }
+        )
+    }
+
+    // データ取得設定ダイアログ
+    if (uiState.showDataFetchSettingsDialog) {
+        DataFetchSettingsDialog(
+            currentMode = uiState.dataFetchMode,
+            onSelectMode = { mode -> viewModel.setDataFetchMode(mode) },
+            onDismiss = { viewModel.closeDataFetchSettingsDialog() }
+        )
+    }
+
     // 8. ヘルプ
     if (uiState.showHelpDialog) {
         HelpDialog(
@@ -527,6 +554,8 @@ fun TimetableScreen(
             currentFontSize = uiState.timetableFontSize,
             currentColumnCount = uiState.columnCount,
             currentTableDisplayCount = uiState.tableDisplayCount,
+            currentDataFetchMode = uiState.dataFetchMode,
+            isIgnoringBatteryOptimizations = uiState.isIgnoringBatteryOptimizations,
             onToggleDeveloperMode = { viewModel.toggleDeveloperMode() },
             onToggleHighlightChangedPeriods = { enabled -> viewModel.setHighlightChangedPeriods(enabled) },
             onDismiss = { viewModel.closeOtherMenuSheet() },
@@ -561,6 +590,12 @@ fun TimetableScreen(
             onOpenNotificationSettings = {
                 viewModel.closeOtherMenuSheet()
                 viewModel.openNotificationSettingsDialog()
+            },
+            onOpenDataFetchSettings = {
+                viewModel.openDataFetchSettingsDialog()
+            },
+            onOpenBatteryOptimization = {
+                viewModel.openBatteryOptimizationDialog()
             },
             onOpenDeveloperMenu = { viewModel.openCsvSettingsDialog() },
             onOpenHistory = { viewModel.openHistoryDialog() },
